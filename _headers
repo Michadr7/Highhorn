@@ -1,0 +1,5 @@
+# Cloudflare Pages: always check for a newer version, so players get updates straight away
+/*
+  Cache-Control: no-cache
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
