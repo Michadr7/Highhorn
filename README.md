@@ -11,7 +11,7 @@ A 3D hex board game for the browser: settle the highlands, gather resources, rai
 | `js/engine.js` | The rules engine, game data and map generation. Pure: no graphics, so it can also run on a server |
 | `js/bots.js` | The AI opponents |
 | `js/sound.js` | Sound effects, music and ambience (generated in the browser, no audio files) |
-| `js/game.js` | The 3D board, interface, lobby, saving and game flow |
+| `js/game.js` | The 3D board, interface, lobby, saving, game flow and online play |
 | `favicon.svg` | The browser tab icon |
 | `_headers` | Cloudflare Pages settings so players always get the newest version |
 
@@ -31,4 +31,4 @@ Saved games and profiles live in each player's browser and are kept across updat
 
 ## Version
 
-0.22.1
+0.23

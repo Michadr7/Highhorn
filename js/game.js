@@ -1,4 +1,4 @@
-/* Highhorn 0.22.1: 3D board, interface, lobby and saving.
+/* Highhorn 0.23: 3D board, interface, lobby and saving.
    Files load in this order: engine.js, bots.js, sound.js, game.js. */
 'use strict';
 /* =====================================================================
@@ -1244,6 +1244,8 @@ function beginGame(){
   const seed=$('#seed').value.trim()||randomSeed(); $('#seed').value=seed;
   if(lobby&&lobby[0]&&lobby[0].type){
     try{localStorage.setItem('hexworld.seats2',JSON.stringify(lobby.map(s=>({type:s.type,color:s.color,hero:s.hero,ai:s.ai}))));}catch(e){}
+    // empty online seats become bots
+    lobby.forEach((s,i)=>{if(s.type==='online'&&!(NET.mode==='host'&&NET.conns.some(g=>g.seat===i))){s.type='bot';s.ai='';}});
     lobby=lobby.map(s=>({ai:s.type==='bot'&&s.ai?s.ai:null,color:s.color,bot:s.type==='bot',you:s.type==='you',hero:JSON.parse(JSON.stringify(s.type==='you'?profile.hero:s.hero))}));
   }
   hideLobby();
@@ -1253,8 +1255,10 @@ function beginGame(){
   const B=Board.generate(seed,R,$('#balanced').checked,$('#mapStyle').value);
   G=Engine.newGame(B,np,seed,lobby.map(s=>s.hero),{diceDeck:$('#dicedeck').checked,nightRules:$('#nightRules').checked,friendly:$('#friendly').checked,timer:$('#timerOn').checked?+$('#timerSec').value:0,bots:lobby.map(s=>s.bot),ai:lobby.map(s=>s.ai||null)}); curR=R; mode=null; selEdge=null; modalKind=null; $('#modal').hidden=true;
   G.you=lobby.findIndex(s=>s.you);
+  startRecordingAndShare=true;
   startRecording({ruleset:RULESET,seed,R,style:$('#mapStyle').value,balanced:$('#balanced').checked,np,heroes:lobby.map(s=>s.hero),opts:JSON.parse(JSON.stringify(G.opts)),colors:lobby.map(s=>s.color)});
   buildScene(B); renderPieces(G); frameCamera(R);
+  if(NET.mode==='host') hostStartGame();
   drawDie($('#d1'),0); drawDie($('#d2'),0);
   refresh.prev=[]; $('#evbanner').hidden=true;
   refresh(); openFirst();
@@ -1341,7 +1345,7 @@ function refresh(){
   const m=isBot(p)?null:effectiveMode(); showMarkers(G,m,legalFor(m));
   if(ghost) ghost.material=pMat(p).ghost;
   // phase-driven dialogs
-  if(G.phase==='discard'&&modalKind!=='discard'&&!isBot(G.discard[0].p)) openDiscard();
+  if(G.phase==='discard'&&modalKind!=='discard'&&!isBot(G.discard[0].p)&&!(NET.mode==='client'&&NET.pendingReq)) openDiscard();
   else if(G.phase==='steal'&&modalKind!=='steal'&&!isBot(G.cur)) openSteal();
   else if(G.phase==='over'&&modalKind!=='over') openWinner();
   scheduleBot();
@@ -1399,6 +1403,7 @@ function startNego(from,give,get){
   nego={from,give:{...give},get:{...get},responses:{}};
   for(let q=0;q<G.np;q++){
     if(q===from) continue;
+    if(isRemote(q)){nego.responses[q]={r:'decline'};continue;}
     if(isBot(q)&&!canPay(q,get)){nego.responses[q]={r:'cannot'};continue;}
     if(isBot(q)){
       nego.responses[q]={r:'pending'};
@@ -1537,12 +1542,12 @@ function armyWhyNot(e){
   const errs=[...G.B.edges.values()].map(t=>Engine.moveInfo(G,e,t).err).filter(x=>x&&!/one road at a time|only move along roads/.test(x));
   return errs[0]||'This army has nowhere it can move right now.';
 }
-function isBot(p){return !!(G&&G.players[p]&&G.players[p].bot);}
+function isBot(p){return !!(G&&G.players[p]&&(G.players[p].bot||isRemote(p)));}
 let botTimer=null, botTurn={key:'',trades:0,actions:0,moved:false};
 function botActor(){
   if(!G||G.phase==='over') return null;
-  if(G.phase==='discard') return isBot(G.discard[0].p)?G.discard[0].p:null;
-  return isBot(G.cur)?G.cur:null;
+  if(G.phase==='discard') return isAI(G.discard[0].p)?G.discard[0].p:null;
+  return isAI(G.cur)?G.cur:null;
 }
 function scheduleBot(){
   if(botTimer||botActor()===null) return;
@@ -1587,6 +1592,7 @@ function botStep(){
   after(r&&r.err?{}:r);
 }
 function after(r,okMsg){
+  if(r&&r.pending){refresh();return false;}
   if(r&&!r.err){
     if(r.plunder){const x=r.plunder,me=viewer();Snd.play(x.l===me&&!isBot(me)?'robbed':'coin');react(x.w,'sly');react(x.l,'sad');
       setTimeout(()=>toast(x.w===me||x.l===me?`${pname(x.w)} plunders 1 ${rname(x.res)} from ${pname(x.l)}.`:`${pname(x.w)} plunders a card from ${pname(x.l)}.`),900);}
@@ -1776,8 +1782,12 @@ document.querySelectorAll('.act[data-act]').forEach(b=>b.addEventListener('click
 $('#roll').addEventListener('click',()=>{if(G&&!isBot(G.cur)) doRoll();});
 function doRoll(){
   if(!G||G.phase!=='roll'||rolling) return;
+  if(NET.mode==='client'){Engine.roll(G);return;}
   rolling=true; refresh(); Snd.play('dice');
   const r=Engine.roll(G);
+  rollVisual(r);
+}
+function rollVisual(r){
   drawDie($('#d1'),r.d1,true); drawDie($('#d2'),r.d2,true);
   const finish=()=>{
     rolling=false;
@@ -1810,6 +1820,7 @@ function walkArmy(fromPos,to){
 function doMove(from,to){
   const fromPos=edgeMid(from.key);
   const r=Engine.moveArmy(G,from,to);
+  if(r.pending) return;
   if(r.err){toast(r.err,'err');return;}
   if(!r.battle) setTimeout(()=>walkArmy(fromPos,to),0);
   selEdge=to.army&&to.army.p===G.cur&&Engine.legal.moves(G,to).length?to:null;
@@ -1840,7 +1851,7 @@ function openBattle(from,to,info){
     $('#mbox').classList.add('battle');
   });
 }
-$('#buydev').addEventListener('click',()=>{const go=()=>{const r=Engine.buyDev(G);if(r.err){toast(r.err,'err');return;}revealCard(r.card);};if(!canAffordUi(COSTS.dev)){go();return;}if(sure('dev',go)) go();});
+$('#buydev').addEventListener('click',()=>{const go=()=>{const r=Engine.buyDev(G);if(r.pending) return;if(r.err){toast(r.err,'err');return;}revealCard(r.card);};if(!canAffordUi(COSTS.dev)){go();return;}if(sure('dev',go)) go();});
 function revealCard(k){
   Snd.play('card');
   const rv=$('#reveal'), col=k==='vp'?'#c99a1e':'#2c6a70';
@@ -2061,7 +2072,7 @@ function sure(kind,doIt){
   return false;
 }
 const UI_ACTS={clearFree:G=>{G.freeRoads=0;G.freeArmy=0;}};
-let replaying=false, saveMeta=null, saveTimer=null;
+let replaying=false, saveMeta=null, saveTimer=null, startRecordingAndShare=false;
 function encArg(a){
   if(a&&typeof a==='object'){
     if(a.key!==undefined&&G){if(G.B.corners.get(a.key)===a) return {__c:a.key};if(G.B.edges.get(a.key)===a) return {__e:a.key};if(G.B.tileMap.get(a.key)===a) return {__t:a.key};}
@@ -2081,12 +2092,13 @@ function decArg(a){
 for(const name of MUTATORS){
   const orig=Engine[name];
   Engine[name]=function(g,...args){
+    if(NET.mode==='client'&&!replaying&&g===G){if(NET.lost) return {err:'The connection to the host was lost.'};netReq(name,args);return {pending:true};}
     const r=orig(g,...args);
-    if(!replaying&&g===G&&saveMeta&&!(r&&r.err)){G.actions.push([name,args.map(encArg)]);scheduleSave();}
+    if(!replaying&&g===G&&saveMeta&&!(r&&r.err)){const a=[name,args.map(encArg)];G.actions.push(a);scheduleSave();if(NET.mode==='host') netBroadcast({t:'act',a});}
     return r;
   };
 }
-function recordUi(name){if(!replaying&&G&&saveMeta){UI_ACTS[name](G);G.actions.push(['ui:'+name,[]]);scheduleSave();}}
+function recordUi(name){if(NET.mode==='client'){netSend(NET.host,{t:'req',a:['ui:'+name,[]]});return;}if(!replaying&&G&&saveMeta){UI_ACTS[name](G);G.actions.push(['ui:'+name,[]]);scheduleSave();if(NET.mode==='host') netBroadcast({t:'act',a:['ui:'+name,[]]});}}
 function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(writeSave,250);}
 function writeSave(){
   if(!G||!saveMeta) return;
@@ -2118,6 +2130,189 @@ function loadSaved(){
   refresh.prev=[]; $('#evbanner').hidden=true; nego=null; mode=null; selEdge=null; topFor=null;
   refresh(); toast(`Welcome back! Round ${Math.max(1,Math.ceil(G.turnNo/G.np))}, ${pname(G.cur)} to play.`);
   return true;
+}
+
+/* =====================================================================
+   ONLINE PLAY (host in the browser): the host runs the real game; guests keep an exact copy
+   by replaying every move the host sends. Guests send their moves to the host, which checks
+   them, applies them and passes them on. Players connect directly (WebRTC via PeerJS).
+   ===================================================================== */
+const NET={mode:null,peer:null,conns:[],host:null,code:'',mySeat:null,remote:new Set(),guests:[],queue:[],busy:false};
+const ROOM_PREFIX='highhorn-room-';
+const netOK=()=>typeof Peer!=='undefined';
+function isRemote(p){return NET.mode==='host'?NET.remote.has(p):NET.mode==='client'?p!==NET.mySeat:false;}
+function isAI(p){return !!(G&&G.players[p]&&G.players[p].bot)&&NET.mode!=='client';}
+function roomCode(){const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<5;i++) s+=A[Math.floor(Math.random()*A.length)];return s;}
+function netSend(conn,msg){try{conn.open&&conn.send(msg);}catch(e){}}
+function netBroadcast(msg){NET.conns.forEach(c=>netSend(c.conn,msg));}
+
+/* ---- host ---- */
+function hostRoom(){
+  if(!netOK()){toast('Online play needs the website version of Highhorn.','err');return;}
+  if(NET.peer) return;
+  NET.code=roomCode(); NET.mode='host';
+  const peer=new Peer(ROOM_PREFIX+NET.code); NET.peer=peer;
+  peer.on('open',()=>{renderOnline();toast(`Room ${NET.code} is open. Share the code with your friends.`);});
+  peer.on('error',e=>{if(e.type==='unavailable-id'){peer.destroy();NET.peer=null;hostRoom();return;}toast('Online error: '+(e.type||e.message),'err');});
+  peer.on('connection',conn=>{
+    conn.on('data',m=>hostReceive(conn,m));
+    conn.on('close',()=>guestLeft(conn));
+  });
+  renderOnline();
+}
+function hostReceive(conn,m){
+  if(!m||typeof m!=='object') return;
+  if(m.t==='hello'){
+    if(G&&saveMeta&&G.phase!=='over'&&!$('#lobbyScr').hidden===false){netSend(conn,{t:'refused',why:'The game has already started.'});return;}
+    const g={conn,name:String(m.name||'Guest').slice(0,16),hero:m.hero,seat:null};
+    NET.conns.push(g); assignGuests(); netSend(conn,{t:'welcome',code:NET.code}); hostLobbyUpdate();
+    toast(`${g.name} joined the room.`); Snd.play('offer'); return;
+  }
+  if(m.t==='req'){
+    const g=NET.conns.find(x=>x.conn===conn); if(!g||g.seat===null||!G) return;
+    const [name,args]=m.a||[];
+    if(!MUTATORS.includes(name)&&name!=='ui:clearFree') return;
+    const actor=G.phase==='discard'?G.discard[0].p:G.cur;
+    if(actor!==g.seat){netSend(conn,{t:'err',msg:'It isn’t your turn.'});return;}
+    netQueue({name,args,from:g.seat});
+  }
+}
+// Guests fill the seats marked "Online" in Play, in order
+function assignGuests(){
+  if(!lobby||!lobby[0]||!lobby[0].type) return;
+  const seats=lobby.map((s,i)=>s.type==='online'?i:-1).filter(i=>i>=0);
+  NET.conns.forEach(g=>{g.seat=null;});
+  NET.conns.forEach((g,k)=>{if(k<seats.length){g.seat=seats[k];const s=lobby[seats[k]];
+    if(g.hero&&ABILITIES[g.hero.ability]) s.hero={name:String(g.hero.name||g.name).slice(0,16),ability:g.hero.ability,look:g.hero.look||{}};s.guestName=g.name;}});
+  if(lbSec==='play') renderSeats();
+}
+function hostLobbyUpdate(){
+  const seats=(lobby||[]).map((s,i)=>({seat:i,color:s.color,type:s.type,name:s.type==='you'?profile.hero.name:(s.hero&&s.hero.name)||'',who:s.type==='online'?(NET.conns.find(g=>g.seat===i)||{}).name||'(waiting)':s.type}));
+  NET.conns.forEach(g=>netSend(g.conn,{t:'lobby',seats,you:g.seat,code:NET.code}));
+  renderOnline();
+}
+function guestLeft(conn){
+  const g=NET.conns.find(x=>x.conn===conn); NET.conns=NET.conns.filter(x=>x.conn!==conn); if(!g) return;
+  if(G&&g.seat!==null&&NET.remote.has(g.seat)&&G.phase!=='over'){NET.remote.delete(g.seat);G.players[g.seat].bot=true;toast(`${g.name} left. A bot takes over their seat.`);refresh();scheduleBot();}
+  else{assignGuests();hostLobbyUpdate();toast(`${g.name} left the room.`);}
+}
+// Called by beginGame on the host once the game exists
+function hostStartGame(){
+  if(NET.mode!=='host') return;
+  NET.remote=new Set(NET.conns.filter(g=>g.seat!==null).map(g=>g.seat));
+  NET.conns.forEach(g=>{if(g.seat!==null) netSend(g.conn,{t:'start',meta:saveMeta,seat:g.seat});else netSend(g.conn,{t:'refused',why:'There was no seat for you in this game.'});});
+}
+
+/* ---- guest ---- */
+function joinRoom(code){
+  if(!netOK()){toast('Online play needs the website version of Highhorn.','err');return;}
+  code=String(code||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,''); if(code.length<4){toast('Enter the room code from the host.','err');return;}
+  if(NET.peer) NET.peer.destroy();
+  NET.mode='client'; NET.code=code; const peer=new Peer(); NET.peer=peer;
+  peer.on('open',()=>{const conn=peer.connect(ROOM_PREFIX+code,{reliable:true}); NET.host=conn;
+    conn.on('open',()=>{netSend(conn,{t:'hello',name:profile.hero.name,hero:profile.hero});});
+    conn.on('data',clientReceive);
+    conn.on('close',()=>{toast('The connection to the host was lost. The game is paused.','err');NET.lost=true;refresh();});
+  });
+  peer.on('error',e=>toast(e.type==='peer-unavailable'?`No room with the code ${code}. Check the code and try again.`:'Online error: '+(e.type||e.message),'err'));
+  NET.lobby=null; renderOnline();
+}
+function clientReceive(m){
+  if(!m||typeof m!=='object') return;
+  if(m.t==='welcome'){toast(`Joined room ${m.code}. Waiting for the host to start.`);Snd.play('offer');}
+  if(m.t==='lobby'){NET.lobby=m;NET.mySeat=m.you;renderOnline();}
+  if(m.t==='refused'){toast(m.why,'err');leaveOnline();}
+  if(m.t==='err'){NET.pendingReq=0;toast(m.msg,'err');}
+  if(m.t==='start') clientStart(m.meta,m.seat);
+  if(m.t==='act'&&G){NET.pendingReq=0;netQueue({name:m.a[0],args:m.a[1],echo:true});}
+}
+function clientStart(meta,seat){
+  NET.mySeat=seat;
+  meta.colors.forEach((c,i)=>{PLAYERS[i]=Object.assign({},PALETTE.find(x=>x.name===c));});
+  setLabels(meta.heroes);
+  const B=Board.generate(meta.seed,meta.R,meta.balanced,meta.style||'classic');
+  replaying=true; G=Engine.newGame(B,meta.np,meta.seed,meta.heroes,meta.opts); replaying=false;
+  G.you=seat; G.actions=[]; saveMeta=null;
+  hideLobby(); curR=B.R; buildScene(B); renderPieces(G); frameCamera(B.R);
+  drawDie($('#d1'),0); drawDie($('#d2'),0); topFor=null; refresh.prev=[];
+  toast(`The game begins! You are ${pname(seat)}.`); Snd.play('fanfare');
+}
+// One move at a time: further moves wait until the host has answered the last one (or 4 seconds pass)
+function netReq(name,args){if(NET.pendingReq&&Date.now()-NET.pendingReq<4000) return;NET.pendingReq=Date.now();netSend(NET.host,{t:'req',a:[name,args.map(encArg)]});}
+function leaveOnline(){try{NET.peer&&NET.peer.destroy();}catch(e){}Object.assign(NET,{mode:null,peer:null,conns:[],host:null,code:'',mySeat:null,remote:new Set(),lobby:null,queue:[],busy:false});renderOnline();}
+
+/* ---- applying moves in order, with the same animations everyone sees ---- */
+function netQueue(job){NET.queue.push(job);if(!NET.busy) netNext();}
+function netNext(){
+  const job=NET.queue.shift(); if(!job){NET.busy=false;return;}
+  NET.busy=true;
+  const done=()=>setTimeout(netNext,30);
+  try{applyAndPresent(job,done);}catch(e){console.warn('online move failed',e);done();}
+}
+function applyAndPresent(job,done){
+  const {name,echo}=job, args=job.args.map(decArg);
+  const exec=()=>{if(name.startsWith('ui:')){if(echo) UI_ACTS[name.slice(3)](G); else recordUi(name.slice(3));return {};}
+    if(echo){replaying=true;try{return Engine[name](G,...args);}finally{replaying=false;}} return Engine[name](G,...args);};
+  const mine=echo&&(G.phase==='discard'?G.discard[0].p:G.cur)===NET.mySeat, actor=G.phase==='discard'?G.discard[0].p:G.cur;
+  if(name==='moveArmy'){
+    const [from,to]=args, info=Engine.moveInfo(G,from,to);
+    if(info.battle){battleAnim(from,to,()=>{const r=exec();after(r);done();});return;}
+    const fromPos=edgeMid(from.key); const r=exec(); if(!r.err) setTimeout(()=>walkArmy(fromPos,to),0); after(r); done(); return;
+  }
+  if(name==='placeVillage'||name==='placeCity') justBuilt=args[0].key;
+  if(name==='placeRoad') justBuilt=args[0].key;
+  if(name==='placeFisher') justBuilt='f'+args[0].key;
+  if(name==='raiseArmy') justBuilt='a'+args[0].key;
+  if(name==='roll'){rolling=true;refresh();Snd.play('dice');const r=exec();if(r.err){rolling=false;after(r);done();return;}rollVisual(r);setTimeout(done,reduceMotion()?0:1050);return;}
+  const r=exec();
+  if(r&&r.err){if(!echo) netSendTo(job.from,{t:'err',msg:r.err});done();return;}
+  switch(name){
+    case 'buyDev': if(echo&&mine) revealCard(r.card); else toast(`${pname(actor)} buys a development card.`); break;
+    case 'playDev': Snd.play('card'); if(!mine) announce({icon:'D',art:args[0],color:'#2c6a70',kicker:`${pname(actor)} plays a development card`,title:DEV[args[0]].name,text:DEV[args[0]].desc,ms:3000}); break;
+    case 'bankTrade': Snd.play('coin'); if(!mine) toast(`${pname(actor)} trades with the bank.`); break;
+    case 'playerTrade': Snd.play('coin'); break;
+    case 'moveHero': if(r.chased) eventBanner(r.chased,true,`${G.heroes[actor].name} chased the ${r.chased==='wolf'?'wolf':'bandits'} away.`); break;
+    case 'endTurn': drawDie($('#d1'),0); drawDie($('#d2'),0); break;
+  }
+  after(r);
+  if(r&&r.gains&&(name==='placeVillage')) r.gains.forEach((g,i)=>collect(g,i));
+  if(r&&r.victim!==undefined&&(name==='moveRobber'||name==='steal')) stealShow(r);
+  done();
+}
+function netSendTo(seat,msg){const g=NET.conns.find(x=>x.seat===seat);if(g) netSend(g.conn,msg);}
+
+/* ---- lobby: Online section ---- */
+function renderOnline(){
+  const el=$('#lb-online'); if(!el) return;
+  if(!netOK()){el.innerHTML=`<h3>Online play</h3><p>Online play works on the website version of Highhorn, where players can connect to each other. In this preview it isn’t available.</p>`;return;}
+  if(NET.mode==='host'){
+    const online=(lobby||[]).filter(s=>s.type==='online').length;
+    el.innerHTML=`<h3>Hosting a game</h3><p>Share this room code with your friends. They open Highhorn, choose <strong>Online</strong> and enter it.</p>
+      <div class="roomcode">${NET.code||'…'}</div>
+      <p class="m">${online?`${NET.conns.length} of ${online} online ${online===1?'seat':'seats'} filled.`:'In Play, set the seats your friends will take to <strong>Online</strong>.'} Joined: ${NET.conns.map(g=>`<strong>${esc(g.name)}</strong>`).join(', ')||'nobody yet'}.</p>
+      <div class="mact" style="justify-content:flex-start"><button class="primary" id="onPlay">Set up seats and start</button><button class="btn" id="onClose">Close the room</button></div>
+      <p class="m" style="font-size:.85rem">Keep this tab open while you play: your browser runs the game for everyone.</p>`;
+    $('#onPlay').addEventListener('click',()=>renderLobby('play'));
+    $('#onClose').addEventListener('click',()=>{netBroadcast({t:'refused',why:'The host closed the room.'});leaveOnline();});
+    return;
+  }
+  if(NET.mode==='client'){
+    const L=NET.lobby;
+    el.innerHTML=`<h3>Room ${esc(NET.code)}</h3>${L?`<p>You’re in! Waiting for the host to start the game.</p>
+      <div class="olist">${L.seats.map(s=>`<div><span class="sw" style="background:${(PALETTE.find(c=>c.name===s.color)||{}).css}"></span> ${s.seat===L.you?'<strong>You</strong>':esc(s.who==='you'?'Host':s.who==='bot'?'Bot':s.who==='guest'?'Guest at the host':s.who)}</div>`).join('')}</div>`
+      :'<p>Connecting…</p>'}<div class="mact" style="justify-content:flex-start"><button class="btn" id="onLeave">Leave</button></div>`;
+    $('#onLeave').addEventListener('click',leaveOnline);
+    return;
+  }
+  el.innerHTML=`<h3>Online play</h3><p>Play with friends on their own devices. One player hosts, and the others join with a room code.</p>
+    <div class="lbgrid">
+      <div class="lbcard"><strong>Host a game</strong><span>Open a room and get a code to share. Your browser runs the game, so keep the tab open while you play.</span><button class="primary" id="onHost" style="margin-top:8px">Open a room</button></div>
+      <div class="lbcard"><strong>Join a game</strong><span>Enter the code from the host.</span><input id="onCode" maxlength="8" placeholder="Room code" autocomplete="off" style="text-transform:uppercase;margin-top:8px;font-size:1.2rem;letter-spacing:.15em"><button class="primary" id="onJoin" style="margin-top:8px">Join</button></div>
+    </div>
+    <p class="m" style="font-size:.85rem;margin-top:10px">Players connect directly to each other. A few strict networks (some offices and schools) block this.</p>`;
+  $('#onHost').addEventListener('click',hostRoom);
+  $('#onJoin').addEventListener('click',()=>joinRoom($('#onCode').value));
+  $('#onCode').addEventListener('keydown',e=>{if(e.key==='Enter') joinRoom($('#onCode').value);});
 }
 
 /* =====================================================================
@@ -2211,13 +2406,14 @@ function hideLobby(){$('#lobbyScr').hidden=true;controls.autoRotate=false;}
 function renderLobby(sec){
   lbSec=sec;
   document.querySelectorAll('#lbNav button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.sec===sec)));
-  ['home','play','hero','profile','rules'].forEach(k=>$('#lb-'+k).hidden=k!==sec);
+  ['home','play','hero','profile','rules','online'].forEach(k=>$('#lb-'+k).hidden=k!==sec);
   renderLbHead();
   if(sec==='home') renderHome();
   if(sec==='play') renderSeats();
   if(sec==='hero') renderCreator();
   if(sec==='profile') renderProfile();
   if(sec==='rules') renderRules();
+  if(sec==='online') renderOnline();
 }
 function renderLbHead(){
   const L=levelInfo(profile.xp);
@@ -2228,6 +2424,7 @@ $('#lbProf').addEventListener('click',()=>renderLobby('profile'));
 
 /* ---- home ---- */
 const UPDATE_NOTES=[
+  {v:'0.23',items:['Online play: host a room and share its code, or join a friend’s room from your own device','Seats in Play can be set to Online for friends who join','Empty online seats are taken by bots, and a bot steps in if a player leaves']},
   {v:'0.22.1',items:['Dropdown menus are readable in dark mode','Close button on every dialog; click outside or press Escape to close','Roads can join a bridge where a river meets a lake']},
   {v:'0.22',items:['Map styles in Play: Classic, Clustered, River country, Lakeland and Rugged highlands','Armies march step by step to their new road','No more long streaky shadows at night']},
   {v:'0.21',items:['A big sound upgrade: wooden pieces, dice rattling in a cup, papery cards, ringing coins, deep frame drums, footsteps and brassy horns','A warm room sound on every effect','Birdsong by day, crickets and the odd owl at night, and quieter music after dark','Ambience follows the music switch in the Menu']},
@@ -2254,13 +2451,14 @@ function renderHome(){
     ${sv?`<button class="lbcard hl" data-go="resume"><span class="lbic">${svgI('turn')}</span><strong>Continue saved game</strong><span>Round ${sv.round}: ${sv.names.map((n,i)=>`${n} ${sv.points[i]}`).join(', ')}. Saved ${new Date(sv.savedAt).toLocaleString([], {dateStyle:'medium',timeStyle:'short'})}.</span></button>`:''}
     <button class="lbcard" data-go="rules"><span class="lbic">${svgI('dev')}</span><strong>How to play</strong><span>The rules in a few minutes, and tips for your first games.</span></button>
     <button class="lbcard hl" data-go="play"><span class="lbic">${svgI('dev')}</span><strong>Play</strong><span>Against bots, or with friends passing one device.</span></button>
-    <button class="lbcard" data-go="online"><span class="lbic">${svgI('merchant')}</span><strong>Online</strong><span>Host a game from your browser or join with a code. Coming once the game is on its own website.</span></button>
+    <button class="lbcard" data-go="online"><span class="lbic">${svgI('merchant')}</span><strong>Online</strong><span>Play with friends on their own devices: host a room or join with a code.</span></button>
     <button class="lbcard" data-go="hero"><span class="lbic">${svgI('hero')}</span><strong>Hero</strong><span>Create and customize ${profile.hero.name}: looks, banner and ability.</span></button>
     <button class="lbcard" data-go="profile"><span class="lbic">${svgI('vp')}</span><strong>Profile</strong><span>Level ${levelInfo(profile.xp).lvl}, ${Object.keys(profile.achievements).length} of ${ACH.length} achievements, unlocks and recent games.</span></button>
   </div>`;
   {const n=UPDATE_NOTES[0];$('#lb-home .lbgrid').insertAdjacentHTML('beforeend',`<div class="lbcard notes"><span class="lbic">${svgI('dev')}</span><strong>What's new in ${n.v}</strong><ul>${n.items.map(i=>`<li>${i}</li>`).join('')}</ul><button class="btn sm" id="allNotes" style="margin-top:6px">All update notes</button></div>`);
    $('#allNotes').addEventListener('click',openNotes);}
   $('#lb-home').querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>{const g=b.dataset.go;
+    if(g==='online'){renderLobby('online');return;}
     if(g==='continue') hideLobby(); else if(g==='resume') loadSaved(); else if(g==='online') toast('Online play arrives once the game is on its own website. Hosting from your browser will come first.'); else renderLobby(g);}));
 }
 
@@ -2284,16 +2482,18 @@ function renderSeats(){
     return `<div class="seat2" style="--sc:${css}">
       <span class="mini-av" style="width:44px;height:44px">${avatarFrom(h.look,css)}</span>
       <div class="s2main"><div class="s2top"><strong>Player ${i+1}</strong>
-        <span class="tabs s2type" role="group" aria-label="Who plays seat ${i+1}">${['you','guest','bot'].map(t=>`<button data-st="${i}|${t}" aria-pressed="${s.type===t}">${t==='you'?'You':t==='guest'?'Guest':'Bot'}</button>`).join('')}</span></div>
+        <span class="tabs s2type" role="group" aria-label="Who plays seat ${i+1}">${['you','guest','bot','online'].map(t=>`<button data-st="${i}|${t}" aria-pressed="${s.type===t}">${t==='you'?'You':t==='guest'?'Guest':t==='bot'?'Bot':'Online'}</button>`).join('')}</span></div>
         <div class="swrow">${PALETTE.map(c=>`<button class="swb" data-sc="${i}|${c.name}" aria-pressed="${c.name===s.color}" title="${c.name}" style="background:${c.css}"></button>`).join('')}</div>
         ${s.bumped?'<p class="adesc" style="min-height:0;margin:0">That color was taken, so this seat got a random one.</p>':''}
         <div class="s2hero">${s.type==='you'?`<span>${h.name} the ${a.name}</span><button class="btn sm" data-edit="1">Edit hero</button>`
+          :s.type==='online'?`<span>${s.guestName?`<strong>${esc(s.guestName)}</strong> as ${esc(h.name)} the ${a.name}`:NET.mode==='host'?'Waiting for a friend to join…':'Open a room in <strong>Online</strong> first'}</span>`
           :s.type==='guest'?`<input type="text" maxlength="16" value="${h.name.replace(/"/g,'')}" data-gn="${i}" aria-label="Guest hero name"><select data-ga="${i}" aria-label="Guest hero ability">${Object.entries(ABILITIES).map(([k,x])=>`<option value="${k}" ${k===h.ability?'selected':''}>${x.name}</option>`).join('')}</select><button class="btn sm" data-rh="${i}">Random</button>`
           :`<select data-ai="${i}" aria-label="Which AI opponent"><option value="">Random bot</option>${Object.entries(AI_DEFS).map(([k,x])=>`<option value="${k}" ${s.ai===k?'selected':''}>${x.name} ${x.title} (${x.diff})</option>`).join('')}</select>${s.ai?'':`<button class="btn sm" data-rh="${i}">New random hero</button>`}`}</div>
         ${s.type==='bot'&&s.ai?`<p class="aibio"><span class="dpill d${AI_DEFS[s.ai].diff}">${AI_DEFS[s.ai].diff}</span> ${AI_DEFS[s.ai].bio}</p>`:''}
       </div></div>`;}).join('');
   const Q=(sel,fn)=>$('#seats').querySelectorAll(sel).forEach(b=>b.addEventListener('click',()=>{fn(b);renderSeats();}));
   Q('[data-st]',b=>{const [i,t]=b.dataset.st.split('|');const s=lobby[+i];
+    setTimeout(()=>{if(NET.mode==='host'){assignGuests();hostLobbyUpdate();}},0);
     if(t==='you'){lobby.forEach(o=>{if(o.type==='you') o.type='guest';});s.color=profile.color;fixColors(lobby,s);}
     s.type=t; lobby.forEach(o=>o.bumped=false);});
   Q('[data-sc]',b=>{const [i,c]=b.dataset.sc.split('|');const s=lobby[+i];s.color=c;lobby.forEach(o=>o.bumped=false);fixColors(lobby,s);if(s.type==='you'){profile.color=c;saveProfile();}});
@@ -2395,7 +2595,7 @@ function wantLandscape(){
 let keepPortrait=false;
 function checkRotate(){const o=$('#rotateMsg');o.hidden=!(isPhone()&&innerHeight>innerWidth&&!keepPortrait&&$('#lobbyScr').hidden);}
 window.addEventListener('resize',()=>setTimeout(checkRotate,200));
-$('#gen').addEventListener('click',()=>{if(!lobby||!lobby[0]||!lobby[0].type) renderSeats();wantLandscape();beginGame();});
+$('#gen').addEventListener('click',()=>{if(NET.mode==='client'){toast('The host starts the game.','err');return;}if(!lobby||!lobby[0]||!lobby[0].type) renderSeats();wantLandscape();beginGame();});
 $('#toLobby').addEventListener('click',()=>showLobby('home'));
 $('#newseed').addEventListener('click',()=>{$('#seed').value=randomSeed();});
 $('#camMine').addEventListener('click',myArea);

@@ -1,4 +1,4 @@
-/* Highhorn 0.22.1 styles */
+/* Highhorn 0.23 styles */
 :root{
   --ui:1;
   --bg:#c9d8dc; --panel:rgba(238,242,240,.93); --ink:#1d282c; --muted:#56656b;
@@ -592,3 +592,5 @@ b.pnm img{width:14px;height:14px;vertical-align:-2px;margin-right:3px}
 :root[data-theme="dark"]{color-scheme:dark}
 select option,select optgroup{background-color:Canvas;color:CanvasText}
 select option:disabled{color:GrayText}
+.roomcode{font:700 3rem/1 Alegreya,Georgia,serif;letter-spacing:.25em;text-align:center;padding:16px;margin:10px 0;border-radius:14px;background:var(--chip);border:2px dashed var(--accent)}
+.olist div{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)}
