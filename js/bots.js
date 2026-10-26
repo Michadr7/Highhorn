@@ -1,4 +1,4 @@
-/* Highhorn 0.23: AI opponents.
+/* Highhorn 0.24: AI opponents.
    Files load in this order: engine.js, bots.js, sound.js, game.js. */
 'use strict';
 /* =====================================================================

@@ -1,4 +1,4 @@
-/* Highhorn 0.23: sound effects, music and ambience (Web Audio).
+/* Highhorn 0.24: sound effects, music and ambience (Web Audio).
    Files load in this order: engine.js, bots.js, sound.js, game.js. */
 'use strict';
 /* =====================================================================

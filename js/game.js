@@ -1,4 +1,4 @@
-/* Highhorn 0.23: 3D board, interface, lobby and saving.
+/* Highhorn 0.24: 3D board, interface, lobby and saving.
    Files load in this order: engine.js, bots.js, sound.js, game.js. */
 'use strict';
 /* =====================================================================
@@ -1400,10 +1400,16 @@ const offerCards=o=>RKEYS.filter(r=>o[r]).map(r=>`<span class="oc" style="--rc:$
 const offerCardsOld=o=>RKEYS.filter(r=>o[r]).map(r=>Array.from({length:o[r]},()=>`<span class="mc big" style="background:${RES[r].color}" title="${RES[r].name}">${svgI(r)}</span>`).join('')).join('')||'<em>nothing</em>';
 function canPay(q,o){return RKEYS.every(r=>(o[r]||0)<=G.players[q].hand[r]);}
 function startNego(from,give,get){
+  // a guest's offer is run by the host; the guest keeps a copy that the host updates
+  if(NET.mode==='client'){netSend(NET.host,{t:'propose',give,get});nego={from,give:{...give},get:{...get},responses:{},viaHost:true};negoUpdate();return;}
   nego={from,give:{...give},get:{...get},responses:{}};
   for(let q=0;q<G.np;q++){
     if(q===from) continue;
-    if(isRemote(q)){nego.responses[q]={r:'decline'};continue;}
+    if(isRemote(q)){
+      // ask the online player; no answer within 40 seconds counts as a decline
+      nego.responses[q]={r:'pending'}; netSendTo(q,{t:'offer',from,give,get});
+      const n=nego; setTimeout(()=>{if(nego===n&&nego.responses[q].r==='pending'){nego.responses[q]={r:'decline'};netSendTo(q,{t:'negoEnd'});negoUpdate();}},40000);
+      continue;}
     if(isBot(q)&&!canPay(q,get)){nego.responses[q]={r:'cannot'};continue;}
     if(isBot(q)){
       nego.responses[q]={r:'pending'};
@@ -1418,26 +1424,40 @@ function startNego(from,give,get){
 }
 function negoUpdate(){
   if(!nego) return;
-  if(isBot(nego.from)){openIncoming();if(Object.values(nego.responses).every(x=>x.r!=='pending')) setTimeout(resolveBotNego,700);}
+  if(NET.mode==='client'){
+    if(nego.mirror){const x=nego.responses[NET.mySeat];
+      if(x&&x.r!=='pending'){netSend(NET.host,{t:'resp',r:x.r,give:x.give,get:x.get});nego=null;closeModal(true);toast('Your answer was sent.');return;}
+      openIncoming();return;}
+    if(nego.viaHost){if(modalKind==='trade') openTrade('players');return;}
+  }
+  if(NET.mode==='host'&&isRemote(nego.from)) netSendTo(nego.from,{t:'nego',responses:nego.responses});
+  if(isAI(nego.from)){openIncoming();if(Object.values(nego.responses).every(x=>x.r!=='pending')) setTimeout(resolveBotNego,700);}
+  else if(isRemote(nego.from)){
+    // an online player's offer: people at this device answer in the incoming window; the proposer chooses on their own device
+    const localPending=Object.keys(nego.responses).some(q=>!isBot(+q)&&nego.responses[q].r==='pending');
+    if(localPending) openIncoming(); else if(modalKind==='incoming') closeModal(true);
+  }
   else if(modalKind==='trade') openTrade('players');
 }
+function negoEnded(){if(NET.mode==='host') netBroadcast({t:'negoEnd'});}
 function execNego(q,counter){
+  if(NET.mode==='client'&&nego&&nego.viaHost){netSend(NET.host,{t:'pick',q,counter:!!counter});return false;}
   const o=counter?nego.responses[q]:nego, from=nego.from;
   const r=Engine.playerTrade(G,q,o.give,o.get);
   if(r.err){toast(r.err);return false;}
   Snd.play('coin'); react(from,'happy'); react(q,'happy');
   toast(`${pname(from)} trades with ${pname(q)}.`);
-  nego=null; after(r); return true;
+  nego=null; negoEnded(); after(r); return true;
 }
 function resolveBotNego(){
-  if(!nego||!isBot(nego.from)) return;
+  if(!nego||!isAI(nego.from)) return;
   const from=nego.from, rs=nego.responses;
   const acc=Object.keys(rs).filter(q=>rs[q].r==='accept').map(Number);
   const ctr=Object.keys(rs).filter(q=>rs[q].r==='counter'&&canPay(+q,rs[q].get)&&canPay(from,rs[q].give)&&Bot.acceptsTrade(G,from,+q,rs[q].get,rs[q].give)).map(Number);
   closeModal(true);
   if(acc.length) execNego(acc[Math.floor(Math.random()*acc.length)],false);
   else if(ctr.length) execNego(ctr[0],true);
-  else {toast(`Nobody takes ${pname(from)}’s offer.`);Snd.play('decline');nego=null;}
+  else {toast(`Nobody takes ${pname(from)}’s offer.`);Snd.play('decline');nego=null;negoEnded();}
   botWait=false; refresh();
 }
 function respRow(q){
@@ -1873,7 +1893,7 @@ function revealCard(k){
   };
 }
 $('#endturn').addEventListener('click',()=>{if(G&&!isBot(G.cur)) doEndTurn();});
-function doEndTurn(){mode=null;selEdge=null;nego=null;if(after(Engine.endTurn(G))){drawDie($('#d1'),0);drawDie($('#d2'),0);
+function doEndTurn(){mode=null;selEdge=null;if(nego) negoEnded();nego=null;if(after(Engine.endTurn(G))){drawDie($('#d1'),0);drawDie($('#d2'),0);
   const nb=isBot(G.cur), humans=G.players.filter(x=>!x.bot).length;
   Snd.play('turn');
   announce({icon:String(G.turnNo),art:'turn',color:PLAYERS[G.cur].css,kicker:'Next turn',title:`${pname(G.cur)}’s turn`,text:nb?`${pname(G.cur)} is a bot and plays automatically.`:humans>1?`Pass the device to ${pname(G.cur)}.`:'Your turn.',ms:nb?1400:2500});}}
@@ -2039,7 +2059,7 @@ function openTrade(tab){
       $('#mbox').querySelectorAll('[data-get]').forEach(b=>b.addEventListener('click',()=>{S.get=b.dataset.get;openTrade('bank');}));
       $('#tok').addEventListener('click',()=>{const r=Engine.bankTrade(G,S.give,S.get);if(r.err){toast(r.err);return;}Snd.play('coin');after(r);if(G.players[p].hand[S.give]<Engine.rates(G,p)[S.give])S.give=null;openTrade('bank');});
     } else if(nego&&nego.from===p){
-      bindResp(); $('#tcancel').addEventListener('click',()=>{nego=null;openTrade('players');});
+      bindResp(); $('#tcancel').addEventListener('click',()=>{if(NET.mode==='client'&&nego&&nego.viaHost) netSend(NET.host,{t:'cancel'});nego=null;negoEnded();openTrade('players');});
     } else {
       bindStepper('g',S.offer.give,hand,()=>openTrade('players'));
       bindStepper('t',S.offer.get,null,()=>openTrade('players'));
@@ -2168,6 +2188,16 @@ function hostReceive(conn,m){
     NET.conns.push(g); assignGuests(); netSend(conn,{t:'welcome',code:NET.code}); hostLobbyUpdate();
     toast(`${g.name} joined the room.`); Snd.play('offer'); return;
   }
+  if(['propose','resp','pick','cancel'].includes(m.t)){
+    const g=NET.conns.find(x=>x.conn===conn); if(!g||g.seat===null||!G) return;
+    if(m.t==='propose'&&G.cur===g.seat&&G.phase==='main'&&!nego){Snd.play('offer');startNego(g.seat,m.give||{},m.get||{});}
+    if(m.t==='resp'&&nego&&nego.responses[g.seat]&&nego.responses[g.seat].r==='pending'){
+      nego.responses[g.seat]=m.r==='counter'?{r:'counter',give:m.give||{},get:m.get||{}}:{r:m.r==='accept'?'accept':'decline'};
+      Snd.play(m.r==='accept'?'coin':m.r==='counter'?'offer':'decline'); react(g.seat,m.r==='accept'?'happy':m.r==='counter'?'think':'no'); negoUpdate();}
+    if(m.t==='pick'&&nego&&nego.from===g.seat&&nego.responses[m.q]) execNego(+m.q,!!m.counter);
+    if(m.t==='cancel'&&nego&&nego.from===g.seat){nego=null;negoEnded();if(modalKind==='incoming') closeModal(true);}
+    return;
+  }
   if(m.t==='req'){
     const g=NET.conns.find(x=>x.conn===conn); if(!g||g.seat===null||!G) return;
     const [name,args]=m.a||[];
@@ -2224,6 +2254,9 @@ function clientReceive(m){
   if(m.t==='refused'){toast(m.why,'err');leaveOnline();}
   if(m.t==='err'){NET.pendingReq=0;toast(m.msg,'err');}
   if(m.t==='start') clientStart(m.meta,m.seat);
+  if(m.t==='offer'&&G){nego={from:m.from,give:m.give,get:m.get,responses:{[NET.mySeat]:{r:'pending'}},mirror:true};Snd.play('offer');openIncoming();}
+  if(m.t==='nego'&&nego&&nego.viaHost){nego.responses=m.responses;if(modalKind==='trade') openTrade('players');}
+  if(m.t==='negoEnd'&&nego&&(nego.mirror||nego.viaHost)){const was=nego;nego=null;if(modalKind==='incoming') closeModal(true);if(was.viaHost&&modalKind==='trade') openTrade('players');}
   if(m.t==='act'&&G){NET.pendingReq=0;netQueue({name:m.a[0],args:m.a[1],echo:true});}
 }
 function clientStart(meta,seat){
@@ -2272,7 +2305,7 @@ function applyAndPresent(job,done){
     case 'bankTrade': Snd.play('coin'); if(!mine) toast(`${pname(actor)} trades with the bank.`); break;
     case 'playerTrade': Snd.play('coin'); break;
     case 'moveHero': if(r.chased) eventBanner(r.chased,true,`${G.heroes[actor].name} chased the ${r.chased==='wolf'?'wolf':'bandits'} away.`); break;
-    case 'endTurn': drawDie($('#d1'),0); drawDie($('#d2'),0); break;
+    case 'endTurn': drawDie($('#d1'),0); drawDie($('#d2'),0); if(nego){nego=null;negoEnded();if(modalKind==='incoming') closeModal(true);} break;
   }
   after(r);
   if(r&&r.gains&&(name==='placeVillage')) r.gains.forEach((g,i)=>collect(g,i));
@@ -2424,6 +2457,7 @@ $('#lbProf').addEventListener('click',()=>renderLobby('profile'));
 
 /* ---- home ---- */
 const UPDATE_NOTES=[
+  {v:'0.24',items:['Trading between online players: offers, answers and counter-offers travel between devices','Menus in yak chestnut and horn ochre instead of teal']},
   {v:'0.23',items:['Online play: host a room and share its code, or join a friend’s room from your own device','Seats in Play can be set to Online for friends who join','Empty online seats are taken by bots, and a bot steps in if a player leaves']},
   {v:'0.22.1',items:['Dropdown menus are readable in dark mode','Close button on every dialog; click outside or press Escape to close','Roads can join a bridge where a river meets a lake']},
   {v:'0.22',items:['Map styles in Play: Classic, Clustered, River country, Lakeland and Rugged highlands','Armies march step by step to their new road','No more long streaky shadows at night']},
