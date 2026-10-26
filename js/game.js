@@ -1,4 +1,4 @@
-/* Highhorn 0.24: 3D board, interface, lobby and saving.
+/* Highhorn 0.24.1: 3D board, interface, lobby and saving.
    Files load in this order: engine.js, bots.js, sound.js, game.js. */
 'use strict';
 /* =====================================================================
@@ -170,7 +170,10 @@ function addBadge(p,x,y,z,sc=0.22){const sp=new THREE.Sprite(sigilMat(p));sp.pos
 let hoverEdge=null, armyMeshes={}, evFx=null, evFxSig='', rainIM=null, rainData=[], lastRobber=null, battling=false;
 let smokeEm=[], highlighted=[], hlUntil=0, robberHL=[], rods=[], wolfMesh=null, banditMesh=null, selRing=null, selEdge=null, lastEv='';
 const anims=[];
-const reduceMotion=()=>window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Motion: 'system' follows the device's accessibility setting; players can force full or reduced motion in the Menu
+let MOTION='system';
+const deviceReducesMotion=()=>window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const reduceMotion=()=>MOTION==='reduced'||(MOTION!=='full'&&deviceReducesMotion());
 function anim(dur,fn,done,delay=0){if(reduceMotion()){fn(1);done&&done();return;}anims.push({t0:performance.now()+delay,dur,fn,done});}
 const easeOutBack=k=>{const c1=1.70158,c3=c1+1;return 1+c3*Math.pow(k-1,3)+c1*Math.pow(k-1,2);};
 
@@ -1641,6 +1644,23 @@ function nearestIn(list,h,m,maxD){
   }
   return bd<=maxD?best:null;
 }
+function buildingNear(h){
+  let best=null,bd=0.34;
+  for(const k of h.tile.corners){const c=G.B.corners.get(k);if(!c.building) continue;const d=Math.hypot(c.x-h.p.x,c.z-h.p.z);if(d<bd){bd=d;best=c;}}
+  return best;
+}
+function buildingCard(c){
+  const p=c.building.p, city=c.building.type==='city', mine=p===viewer()&&!isBot(p), n=city?2:1;
+  const tiles=G.B.tiles.filter(t=>t.corners.includes(c.key)&&t.num&&TERRAIN[t.terrain].res);
+  const ev=G.events, blocked=t=>t===G.robber||(ev.wolf&&ev.wolf.tile===t.key)||(ev.bandits&&ev.bandits.tile===t.key);
+  const prod=tiles.map(t=>`${n} ${rname(TERRAIN[t.terrain].res)} on ${t.num}${blocked(t)?' <span class="result bad">(blocked)</span>':''}`).join(', ');
+  const sb=Engine.siegedBy(G,c), th=sb===null?Engine.threats(G,p).find(x=>x.c===c):null;
+  let st='';
+  if(sb!==null) st=`<p class="result bad"><strong>Under siege by ${pname(sb)}.</strong> It produces nothing, and ${pname(sb)} takes 1 of each resource it would have produced. Drive the armies off, or wait for them to leave.</p>`;
+  else if(th) st=`<p class="result bad"><strong>⚠ Under threat:</strong> ${pname(th.by)}’s army is close enough to besiege this ${city?'city':'village'} next turn.${mine?' Move an army onto a road beside it to guard it, or attack the army first.':''}</p>`;
+  if(c.fisher) st+=`<p>A fisherman works here.</p>`;
+  return `<h3>${pname(p)}’s ${city?'city':'village'}</h3><p>${city?'2 points':'1 point'}. Produces ${prod||'nothing'}${tiles.length?' when those numbers are rolled':''}.</p>${st}`;
+}
 function nearestCorner(h){return nearestIn(h.tile.corners.map(k=>G.B.corners.get(k)),h,'corner',9);}
 function nearestEdge(h){return nearestIn(h.tile.edges.map(k=>G.B.edges.get(k)),h,'edge',9);}
 function portText(t){return t==='any'?'3:1 for any resource':`2:1 for ${rname(t)}`;}
@@ -1709,6 +1729,8 @@ function hover(ev){
       html=heroes.map(q=>heroCard(q).replace('<h3>',`<h3><span class="mini-av" style="width:26px;height:26px;vertical-align:-7px;margin-right:6px">${avatarSVG(q)}</span>`)+`<p class="m">${pname(q)}’s hero</p>`).join('');
       if(ne.army) html+=`<h3>${pname(ne.army.p)} army</h3><p>${ne.army.n} on this road.${ne.army.p===G.cur&&!isBot(G.cur)&&Engine.legal.movable(G,G.cur).includes(ne)?' Click to move one of them.':''}</p>`;
       if(ne.army&&ne.army.p===G.cur&&!isBot(G.cur)&&Engine.legal.movable(G,G.cur).includes(ne)){hoverEdge=ne;canvas.style.cursor='pointer';}
+    } else if(buildingNear(h)){
+      html=buildingCard(buildingNear(h));
     } else if(h.tile.terrain==='pasture'&&yakNear(h.p,0.2)){
       html=`<h3>Yaks</h3><p>Click to shoo them off the number.</p>`; canvas.style.cursor=BOOT;
     } else html=tileCard(h.tile);
@@ -2457,6 +2479,7 @@ $('#lbProf').addEventListener('click',()=>renderLobby('profile'));
 
 /* ---- home ---- */
 const UPDATE_NOTES=[
+  {v:'0.24.1',items:['Hover over any village or city to see who owns it, what it produces, and whether it is besieged or under threat','Motion setting in the Menu: follow your device, or choose full or reduced motion','A note when your device has asked for less motion, so a still board isn’t a mystery']},
   {v:'0.24',items:['Trading between online players: offers, answers and counter-offers travel between devices','Menus in yak chestnut and horn ochre instead of teal']},
   {v:'0.23',items:['Online play: host a room and share its code, or join a friend’s room from your own device','Seats in Play can be set to Online for friends who join','Empty online seats are taken by bots, and a bot steps in if a player leaves']},
   {v:'0.22.1',items:['Dropdown menus are readable in dark mode','Close button on every dialog; click outside or press Escape to close','Roads can join a bridge where a river meets a lake']},
@@ -2688,11 +2711,18 @@ function applyUi(){
   const wide=window.innerWidth>760&&window.innerHeight>520;
   document.documentElement.style.setProperty('--ui',wide?uiPrefs.size:1);
   document.querySelectorAll('#uisize button').forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.ui===+uiPrefs.size)));
+  MOTION=uiPrefs.motion||'system';
+  document.querySelectorAll('#motionSet button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mo===MOTION)));
+  $('#motionHint').textContent=deviceReducesMotion()?'Your device asks for less motion, so "Follow device" keeps the board still. Choose Full to bring it to life.':'Reduced keeps the board still: no walking, grazing or water movement.';
   $('#followCam').checked=!!uiPrefs.follow; $('#sureOn').checked=!!uiPrefs.confirm; $('#cbOn').checked=!!uiPrefs.cb; DN.on=uiPrefs.dayNight!==false; $('#dayNight').checked=DN.on;
 }
 const saveUi=()=>{try{localStorage.setItem('hexworld.ui',JSON.stringify(uiPrefs));}catch(e){}};
 document.querySelectorAll('#uisize button').forEach(b=>b.addEventListener('click',()=>{uiPrefs.size=+b.dataset.ui;saveUi();applyUi();}));
 $('#followCam').addEventListener('change',e=>{uiPrefs.follow=e.target.checked;saveUi();});
+document.querySelectorAll('#motionSet button').forEach(b=>b.addEventListener('click',()=>{uiPrefs.motion=b.dataset.mo;saveUi();applyUi();if(G) renderPieces(G);}));
+// Tell players once why the board is still when their device asks for less motion
+setTimeout(()=>{if(deviceReducesMotion()&&(uiPrefs.motion||'system')==='system'&&!uiPrefs.motionTold){uiPrefs.motionTold=true;saveUi();
+  toast('Animations are reduced because your device asks for less motion. To bring the board to life, choose Motion: Full in the Menu.');}},4000);
 $('#sureOn').addEventListener('change',e=>{uiPrefs.confirm=e.target.checked;saveUi();});
 $('#cbOn').addEventListener('change',e=>{uiPrefs.cb=e.target.checked;saveUi();if(G){renderPieces(G);refresh();}});
 function applyQuality(rebuild){
