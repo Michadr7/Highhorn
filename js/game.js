@@ -1,5 +1,5 @@
-/* Highhorn: 3D board, interface, lobby, saving and online-ready game flow.
-   Part of the Highhorn game. Files load in this order: engine.js, bots.js, sound.js, game.js. */
+/* Highhorn 0.22.1: 3D board, interface, lobby and saving.
+   Files load in this order: engine.js, bots.js, sound.js, game.js. */
 'use strict';
 /* =====================================================================
    RENDERING (draws the board and game state; never changes rules)
@@ -2228,6 +2228,7 @@ $('#lbProf').addEventListener('click',()=>renderLobby('profile'));
 
 /* ---- home ---- */
 const UPDATE_NOTES=[
+  {v:'0.22.1',items:['Dropdown menus are readable in dark mode','Close button on every dialog; click outside or press Escape to close','Roads can join a bridge where a river meets a lake']},
   {v:'0.22',items:['Map styles in Play: Classic, Clustered, River country, Lakeland and Rugged highlands','Armies march step by step to their new road','No more long streaky shadows at night']},
   {v:'0.21',items:['A big sound upgrade: wooden pieces, dice rattling in a cup, papery cards, ringing coins, deep frame drums, footsteps and brassy horns','A warm room sound on every effect','Birdsong by day, crickets and the odd owl at night, and quieter music after dark','Ambience follows the music switch in the Menu']},
   {v:'0.20: Marching Banners',items:['Armies can march over open ground, off the roads','Battle winners plunder 1 card from the loser','Sieges pay tribute: the besieger takes 1 resource each time the besieged building would produce','Red warning signs over your buildings when an enemy army can reach them','Smarter armies: bots defend, raise armies when threatened and attack for plunder','Night rules: wolves and bandits only come at night and leave at dawn']},

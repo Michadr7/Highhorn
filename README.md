@@ -31,4 +31,4 @@ Saved games and profiles live in each player's browser and are kept across updat
 
 ## Version
 
-0.22 (ruleset 0.20.0)
+0.22.1

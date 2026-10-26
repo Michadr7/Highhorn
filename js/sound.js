@@ -1,5 +1,5 @@
-/* Highhorn: sound effects, music and ambience, generated with Web Audio.
-   Part of the Highhorn game. Files load in this order: engine.js, bots.js, sound.js, game.js. */
+/* Highhorn 0.22.1: sound effects, music and ambience (Web Audio).
+   Files load in this order: engine.js, bots.js, sound.js, game.js. */
 'use strict';
 /* =====================================================================
    SOUND AND MUSIC (generated in the browser with Web Audio; no files)

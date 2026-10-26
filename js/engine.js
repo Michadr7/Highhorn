@@ -1,5 +1,5 @@
-/* Highhorn: rules engine, game data and map generation. Pure: no graphics, no page.
-   Part of the Highhorn game. Files load in this order: engine.js, bots.js, sound.js, game.js. */
+/* Highhorn 0.22.1: rules engine, game data and map generation. Pure: no graphics, no page.
+   Files load in this order: engine.js, bots.js, sound.js, game.js. */
 'use strict';
 const $ = s => document.querySelector(s);
 const SQ3 = Math.sqrt(3);

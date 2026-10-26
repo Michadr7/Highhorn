@@ -1,4 +1,4 @@
-/* Highhorn styles */
+/* Highhorn 0.22.1 styles */
 :root{
   --ui:1;
   --bg:#c9d8dc; --panel:rgba(238,242,240,.93); --ink:#1d282c; --muted:#56656b;
@@ -586,3 +586,9 @@ b.pnm img{width:14px;height:14px;vertical-align:-2px;margin-right:3px}
 .cfm .costs2{display:flex;flex-wrap:wrap;gap:2px;margin-top:6px}
 .mclose{position:sticky;top:0;float:right;z-index:3;width:34px;height:34px;margin:-6px -8px 4px 10px;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--ink);font-size:1.3rem;line-height:1;display:grid;place-items:center;box-shadow:var(--shadow)}
 .mclose:hover{background:var(--chip)}
+/* Tell the browser which colour scheme the page uses, so its own controls (dropdown lists, scrollbars) match */
+:root{color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark}}
+:root[data-theme="dark"]{color-scheme:dark}
+select option,select optgroup{background-color:Canvas;color:CanvasText}
+select option:disabled{color:GrayText}

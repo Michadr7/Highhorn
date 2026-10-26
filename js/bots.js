@@ -1,5 +1,5 @@
-/* Highhorn: AI opponents (pure decision-making on top of the engine).
-   Part of the Highhorn game. Files load in this order: engine.js, bots.js, sound.js, game.js. */
+/* Highhorn 0.22.1: AI opponents.
+   Files load in this order: engine.js, bots.js, sound.js, game.js. */
 'use strict';
 /* =====================================================================
    BOTS (pure decision-making on top of the rules engine)
