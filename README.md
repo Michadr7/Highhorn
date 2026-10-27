@@ -13,13 +13,20 @@ A 3D hex board game for the browser: settle the highlands, gather resources, rai
 | `js/sound.js` | Sound effects, music and ambience (generated in the browser, no audio files) |
 | `js/game.js` | The 3D board, interface, lobby, saving, game flow and online play |
 | `favicon.svg` | The browser tab icon |
+| `worker/index.js` | The server: serves the site and runs online game rooms (Cloudflare Durable Objects) |
+| `wrangler.jsonc` | Cloudflare settings: the Worker's name, the site files and the rooms |
+| `.assetsignore` | Keeps the server files and settings private (not served as web pages) |
 | `_headers` | Cloudflare Pages settings so players always get the newest version |
 
 The files load in this order: `engine.js`, `bots.js`, `sound.js`, `game.js`. The 3D library (three.js r128) loads from a CDN.
 
+## Online play
+
+Online games run through rooms on the site's own Worker. Every player connects to the room over a WebSocket at `/room/<CODE>`; the host's browser runs the game and the room only passes messages between the host and the guests. Rooms are free on the Workers Free plan at this scale. The Worker's name in `wrangler.jsonc` must match the Worker in your Cloudflare account (`highhorn`).
+
 ## Playing locally
 
-Double-click `index.html` to open it in a browser. Everything works offline except the fonts and the 3D library, which load from the internet.
+Double-click `index.html` to open it in a browser. Everything works offline except the fonts, the 3D library and online play (which needs the website's rooms).
 
 ## Publishing an update
 
@@ -31,4 +38,4 @@ Saved games and profiles live in each player's browser and are kept across updat
 
 ## Version
 
-0.24.1
+0.25

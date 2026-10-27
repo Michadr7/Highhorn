@@ -1,4 +1,4 @@
-/* Highhorn 0.24.1: 3D board, interface, lobby and saving.
+/* Highhorn 0.25: 3D board, interface, lobby and saving.
    Files load in this order: engine.js, bots.js, sound.js, game.js. */
 'use strict';
 /* =====================================================================
@@ -2175,31 +2175,38 @@ function loadSaved(){
 }
 
 /* =====================================================================
-   ONLINE PLAY (host in the browser): the host runs the real game; guests keep an exact copy
-   by replaying every move the host sends. Guests send their moves to the host, which checks
-   them, applies them and passes them on. Players connect directly (WebRTC via PeerJS).
+   ONLINE PLAY: the host runs the real game; guests keep an exact copy by replaying every move
+   the host sends. Guests send their moves to the host, which checks them, applies them and
+   passes them on. Everyone connects to a room on the website's own server (a Cloudflare
+   Durable Object) over a WebSocket, which works on any network that can load the site.
    ===================================================================== */
-const NET={mode:null,peer:null,conns:[],host:null,code:'',mySeat:null,remote:new Set(),guests:[],queue:[],busy:false};
-const ROOM_PREFIX='highhorn-room-';
-const netOK=()=>typeof Peer!=='undefined';
+// A small connection object with the same shape the online code uses: on('open'|'data'|'close'), send(obj), open
+function makeConn(sendFn){const h={};return {open:false,h,on(e,f){(h[e]=h[e]||[]).push(f);},emit(e,...a){(h[e]||[]).forEach(f=>f(...a));},send(obj){sendFn(obj);}};}
+function roomURL(code,role){return `${location.protocol==='https:'?'wss:':'ws:'}//${location.host}/room/${code}?role=${role}`;}
+function keepAlive(ws){const t=setInterval(()=>{if(ws.readyState===1) ws.send('ping'); else clearInterval(t);},25000);}
+const NET={mode:null,ws:null,conns:[],host:null,code:'',mySeat:null,remote:new Set(),guests:[],queue:[],busy:false,byId:{}};
+// Rooms live on the website's own server, so online play needs the website (not a local file or the Claude preview)
+const netOK=()=>/^https?:$/.test(location.protocol)&&!/claude|anthropic|claudeusercontent/.test(location.hostname);
 function isRemote(p){return NET.mode==='host'?NET.remote.has(p):NET.mode==='client'?p!==NET.mySeat:false;}
 function isAI(p){return !!(G&&G.players[p]&&G.players[p].bot)&&NET.mode!=='client';}
 function roomCode(){const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<5;i++) s+=A[Math.floor(Math.random()*A.length)];return s;}
-function netSend(conn,msg){try{conn.open&&conn.send(msg);}catch(e){}}
+function netSend(conn,msg){try{conn&&conn.open&&conn.send(msg);}catch(e){}}
 function netBroadcast(msg){NET.conns.forEach(c=>netSend(c.conn,msg));}
 
 /* ---- host ---- */
-function hostRoom(){
-  if(!netOK()){toast('Online play needs the website version of Highhorn.','err');return;}
-  if(NET.peer) return;
-  NET.code=roomCode(); NET.mode='host';
-  const peer=new Peer(ROOM_PREFIX+NET.code); NET.peer=peer;
-  peer.on('open',()=>{renderOnline();toast(`Room ${NET.code} is open. Share the code with your friends.`);});
-  peer.on('error',e=>{if(e.type==='unavailable-id'){peer.destroy();NET.peer=null;hostRoom();return;}toast('Online error: '+(e.type||e.message),'err');});
-  peer.on('connection',conn=>{
-    conn.on('data',m=>hostReceive(conn,m));
-    conn.on('close',()=>guestLeft(conn));
-  });
+function hostRoom(retry=0){
+  if(!netOK()){toast('Online play works on the Highhorn website.','err');return;}
+  if(NET.ws) return;
+  NET.code=roomCode(); NET.mode='host'; NET.byId={};
+  let opened=false; const ws=new WebSocket(roomURL(NET.code,'host')); NET.ws=ws;
+  ws.onopen=()=>{opened=true;keepAlive(ws);renderOnline();toast(`Room ${NET.code} is open. Share the code with your friends.`);};
+  ws.onmessage=ev=>{if(ev.data==='pong') return;let m;try{m=JSON.parse(ev.data);}catch(e){return;}
+    if(m.sys==='join'){const id=m.id;const conn=makeConn(obj=>{if(ws.readyState===1) ws.send(JSON.stringify({to:id,data:JSON.stringify(obj)}));});conn.open=true;NET.byId[id]=conn;
+      conn.on('data',x=>hostReceive(conn,x));conn.on('close',()=>guestLeft(conn));return;}
+    if(m.sys==='leave'){const c=NET.byId[m.id];if(c){c.open=false;delete NET.byId[m.id];c.emit('close');}return;}
+    if(m.from&&NET.byId[m.from]){let d;try{d=JSON.parse(m.data);}catch(e){return;}NET.byId[m.from].emit('data',d);}};
+  ws.onclose=()=>{NET.ws=null;if(!opened){if(retry<3){NET.mode=null;hostRoom(retry+1);}else{toast('Couldn’t open a room. Check your connection and try again.','err');leaveOnline();}return;}
+    if(NET.mode==='host'){toast('The room’s connection dropped. Guests can’t reach this game any more.','err');}};
   renderOnline();
 }
 function hostReceive(conn,m){
@@ -2257,17 +2264,18 @@ function hostStartGame(){
 
 /* ---- guest ---- */
 function joinRoom(code){
-  if(!netOK()){toast('Online play needs the website version of Highhorn.','err');return;}
+  if(!netOK()){toast('Online play works on the Highhorn website.','err');return;}
   code=String(code||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,''); if(code.length<4){toast('Enter the room code from the host.','err');return;}
-  if(NET.peer) NET.peer.destroy();
-  NET.mode='client'; NET.code=code; const peer=new Peer(); NET.peer=peer;
-  peer.on('open',()=>{const conn=peer.connect(ROOM_PREFIX+code,{reliable:true}); NET.host=conn;
-    conn.on('open',()=>{netSend(conn,{t:'hello',name:profile.hero.name,hero:profile.hero});});
-    conn.on('data',clientReceive);
-    conn.on('close',()=>{toast('The connection to the host was lost. The game is paused.','err');NET.lost=true;refresh();});
-  });
-  peer.on('error',e=>toast(e.type==='peer-unavailable'?`No room with the code ${code}. Check the code and try again.`:'Online error: '+(e.type||e.message),'err'));
-  NET.lobby=null; renderOnline();
+  if(NET.ws){try{NET.ws.close();}catch(e){}}
+  NET.mode='client'; NET.code=code; NET.lobby=null;
+  let opened=false; const ws=new WebSocket(roomURL(code,'guest')); NET.ws=ws;
+  const conn=makeConn(obj=>{if(ws.readyState===1) ws.send(JSON.stringify(obj));}); NET.host=conn;
+  ws.onopen=()=>{opened=true;conn.open=true;keepAlive(ws);netSend(conn,{t:'hello',name:profile.hero.name,hero:profile.hero});};
+  ws.onmessage=ev=>{if(ev.data==='pong') return;let m;try{m=JSON.parse(ev.data);}catch(e){return;}clientReceive(m);};
+  ws.onclose=ev=>{conn.open=false;
+    if(!opened){toast(`No open room with the code ${code}. Check the code and try again.`,'err');leaveOnline();return;}
+    if(NET.mode==='client'){toast(ev.code===4000?'The host left. The game is paused.':'The connection to the room was lost. The game is paused.','err');NET.lost=true;refresh();}};
+  renderOnline();
 }
 function clientReceive(m){
   if(!m||typeof m!=='object') return;
@@ -2294,7 +2302,7 @@ function clientStart(meta,seat){
 }
 // One move at a time: further moves wait until the host has answered the last one (or 4 seconds pass)
 function netReq(name,args){if(NET.pendingReq&&Date.now()-NET.pendingReq<4000) return;NET.pendingReq=Date.now();netSend(NET.host,{t:'req',a:[name,args.map(encArg)]});}
-function leaveOnline(){try{NET.peer&&NET.peer.destroy();}catch(e){}Object.assign(NET,{mode:null,peer:null,conns:[],host:null,code:'',mySeat:null,remote:new Set(),lobby:null,queue:[],busy:false});renderOnline();}
+function leaveOnline(){const ws=NET.ws;Object.assign(NET,{mode:null,ws:null,conns:[],host:null,code:'',mySeat:null,remote:new Set(),lobby:null,queue:[],busy:false,byId:{},lost:false});try{ws&&ws.close();}catch(e){}renderOnline();}
 
 /* ---- applying moves in order, with the same animations everyone sees ---- */
 function netQueue(job){NET.queue.push(job);if(!NET.busy) netNext();}
@@ -2339,7 +2347,7 @@ function netSendTo(seat,msg){const g=NET.conns.find(x=>x.seat===seat);if(g) netS
 /* ---- lobby: Online section ---- */
 function renderOnline(){
   const el=$('#lb-online'); if(!el) return;
-  if(!netOK()){el.innerHTML=`<h3>Online play</h3><p>Online play works on the website version of Highhorn, where players can connect to each other. In this preview it isn’t available.</p>`;return;}
+  if(!netOK()){el.innerHTML=`<h3>Online play</h3><p>Online play works on the Highhorn website, where the game rooms live. It isn’t available in this preview or when the game is opened as a local file.</p>`;return;}
   if(NET.mode==='host'){
     const online=(lobby||[]).filter(s=>s.type==='online').length;
     el.innerHTML=`<h3>Hosting a game</h3><p>Share this room code with your friends. They open Highhorn, choose <strong>Online</strong> and enter it.</p>
@@ -2364,7 +2372,7 @@ function renderOnline(){
       <div class="lbcard"><strong>Host a game</strong><span>Open a room and get a code to share. Your browser runs the game, so keep the tab open while you play.</span><button class="primary" id="onHost" style="margin-top:8px">Open a room</button></div>
       <div class="lbcard"><strong>Join a game</strong><span>Enter the code from the host.</span><input id="onCode" maxlength="8" placeholder="Room code" autocomplete="off" style="text-transform:uppercase;margin-top:8px;font-size:1.2rem;letter-spacing:.15em"><button class="primary" id="onJoin" style="margin-top:8px">Join</button></div>
     </div>
-    <p class="m" style="font-size:.85rem;margin-top:10px">Players connect directly to each other. A few strict networks (some offices and schools) block this.</p>`;
+    <p class="m" style="font-size:.85rem;margin-top:10px">Everyone connects through a game room on the Highhorn website, so it works on any network that can open the site.</p>`;
   $('#onHost').addEventListener('click',hostRoom);
   $('#onJoin').addEventListener('click',()=>joinRoom($('#onCode').value));
   $('#onCode').addEventListener('keydown',e=>{if(e.key==='Enter') joinRoom($('#onCode').value);});
@@ -2479,6 +2487,7 @@ $('#lbProf').addEventListener('click',()=>renderLobby('profile'));
 
 /* ---- home ---- */
 const UPDATE_NOTES=[
+  {v:'0.25',items:['Online games now run through rooms on the Highhorn server, so they work on any network: home Wi-Fi, office, school, VPN or mobile data','Clearer messages when a room code is wrong or the host leaves']},
   {v:'0.24.1',items:['Hover over any village or city to see who owns it, what it produces, and whether it is besieged or under threat','Motion setting in the Menu: follow your device, or choose full or reduced motion','A note when your device has asked for less motion, so a still board isn’t a mystery']},
   {v:'0.24',items:['Trading between online players: offers, answers and counter-offers travel between devices','Menus in yak chestnut and horn ochre instead of teal']},
   {v:'0.23',items:['Online play: host a room and share its code, or join a friend’s room from your own device','Seats in Play can be set to Online for friends who join','Empty online seats are taken by bots, and a bot steps in if a player leaves']},
