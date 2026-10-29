@@ -10,15 +10,19 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Alegreya:wght@500;700&family=Alegreya+Sans:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=0.25">
+<link rel="stylesheet" href="css/style.css?v=0.26.8-logo-image">
 </head>
 <body>
 <canvas id="c" tabindex="0" aria-label="Game board. Drag to orbit, scroll or pinch to zoom."></canvas>
 
 <div id="lobbyScr" hidden>
+  <div class="lb-scene" aria-hidden="true"></div>
   <div class="lb-wrap">
-    <header class="lb-head"><div class="lb-title">Highhorn<small>Version 0.25</small></div><button id="lbProf" class="lb-prof glass" aria-label="Your profile"></button></header>
-    <nav id="lbNav" class="lb-nav" aria-label="Lobby"><button data-sec="home">Home</button><button data-sec="play">Play</button><button data-sec="hero">Hero</button><button data-sec="profile">Profile</button><button data-sec="online">Online</button><button data-sec="rules">How to play</button></nav>
+    <aside class="lb-side" aria-label="Highhorn menu">
+      <div class="lb-brand"><img class="lb-logo-image" src="assets/highhorn-logo.png" alt="HIGHHORN" width="2172" height="724"><div class="lb-tagline">Version 0.25 · The Highlands await</div></div>
+      <nav id="lbNav" class="lb-nav" aria-label="Lobby"><button data-sec="home">Home</button><button data-sec="play">Play</button><button data-sec="hero">Hero</button><button data-sec="profile">Profile</button><button data-sec="online">Online</button><button data-sec="rules">How to play</button></nav>
+    </aside>
+    <header class="lb-head"><button id="lbProf" class="lb-prof glass" aria-label="Your profile"></button></header>
     <main class="lb-main glass">
       <section id="lb-home"></section>
       <section id="lb-play" hidden>

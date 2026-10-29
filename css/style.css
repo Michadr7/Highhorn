@@ -594,3 +594,344 @@ select option,select optgroup{background-color:Canvas;color:CanvasText}
 select option:disabled{color:GrayText}
 .roomcode{font:700 3rem/1 Alegreya,Georgia,serif;letter-spacing:.25em;text-align:center;padding:16px;margin:10px 0;border-radius:14px;background:var(--chip);border:2px dashed var(--accent)}
 .olist div{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)}
+
+
+/* Highhorn first-image menu direction: scenery is decorative; original lobby controls stay live. */
+#lobbyScr{background:#a8b6ac;padding:0;isolation:isolate}
+#lobbyScr .lb-scene{position:fixed;inset:0;z-index:-2;pointer-events:none;background-image:url('../assets/main-menu-yak.png');background-size:cover;background-position:center center}
+#lobbyScr::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(90deg,#21190ff5 0%,#281c13f2 27%,#2c2018e8 35%,#261b13b2 42%,transparent 55%)}
+#lobbyScr .lb-wrap{max-width:none;min-height:100vh;min-height:100dvh;margin:0;display:grid;grid-template-columns: minmax(248px,360px) minmax(0,1fr);grid-template-rows:auto 1fr;column-gap:clamp(14px,3vw,52px);row-gap:0;padding:clamp(20px,3.5vw,54px)}
+#lobbyScr .lb-head{grid-column:1/-1;align-self:start;justify-content:space-between;align-items:flex-start;gap:12px;min-height:clamp(125px,21vh,205px)}
+#lobbyScr .lb-title{display:inline-block;color:#fff1cf;font:700 clamp(2.5rem,5vw,5.1rem)/.9 Alegreya,Georgia,serif;letter-spacing:.045em;text-shadow:0 5px 0 #4d2815,0 8px 0 #23160c,0 12px 16px #0009;-webkit-text-stroke:1px #6b3b17}
+#lobbyScr .lb-title small{font:700 .8rem/1.3 'Alegreya Sans',sans-serif;color:#ffe5ba;letter-spacing:.11em;text-transform:uppercase;margin-top:16px;-webkit-text-stroke:0;text-shadow:0 2px 4px #000}
+#lobbyScr .lb-prof{background:#2d201ac9;color:#fff1dd;border:1px solid #ac7b47a3;box-shadow:0 3px 15px #0007;backdrop-filter:blur(10px)}
+#lobbyScr .lb-prof small{color:#e2c5a0}
+#lobbyScr .lb-nav{grid-column:1;grid-row:2;display:flex;flex-direction:column;gap:clamp(8px,1.3vh,14px);max-width:355px;align-self:start}
+#lobbyScr .lb-nav button{font:700 clamp(1.05rem,1.55vw,1.4rem)/1.2 Alegreya,Georgia,serif;text-align:left;min-height:clamp(53px,8vh,75px);padding:12px 22px 12px 70px;border-radius:7px 13px 10px 7px;position:relative;color:#f6dfbc;background:linear-gradient(173deg,#6f4429,#452719 55%,#2d1c16);border:2px solid #93663c;box-shadow:inset 0 2px 2px #c08e5f70,inset 0 -5px 0 #24130a88,0 5px 0 #20130b,0 8px 12px #0007;backdrop-filter:none;text-shadow:0 2px 2px #0009;transition:transform .15s,filter .15s,background .15s}
+#lobbyScr .lb-nav button::before{content:"◆";position:absolute;left:19px;top:50%;transform:translateY(-50%);font-family:Georgia,serif;color:#f3d7a4;font-size:22px;text-shadow:0 1px 4px #000}
+#lobbyScr .lb-nav button:nth-child(1)::before{content:"⌂";font-size:30px}
+#lobbyScr .lb-nav button:nth-child(2)::before{content:"▶"}
+#lobbyScr .lb-nav button:nth-child(3)::before{content:"♜"}
+#lobbyScr .lb-nav button:nth-child(4)::before{content:"♛"}
+#lobbyScr .lb-nav button:nth-child(5)::before{content:"♟"}
+#lobbyScr .lb-nav button:nth-child(6)::before{content:"✦"}
+#lobbyScr .lb-nav button:hover{transform:translateX(5px);filter:brightness(1.14)}
+#lobbyScr .lb-nav button[aria-pressed="true"]{background:linear-gradient(173deg,#ba7d40,#85502b 54%,#533019);color:#fff7de;border-color:#e2ab69}
+#lobbyScr .lb-nav button:focus-visible{outline:3px solid #ffe3a2;outline-offset:3px}
+#lobbyScr .lb-main{grid-column:2;grid-row:2;max-width:1050px;width:100%;max-height:calc(100dvh - 165px);align-self:start;overflow-y:auto;color:var(--ink);background:var(--panel);backdrop-filter:blur(16px);border:1px solid var(--line);box-shadow:0 15px 48px #120d0969}
+#lobbyScr .lb-main:has(#lb-home:not([hidden])){align-self:end;max-height:35vh;max-width:840px;margin-left:auto;background:#24190ee0;color:#ffe9c6;border-color:#c59c65a8;opacity:.94}
+#lobbyScr #lb-home .lbgrid{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:10px;padding:3px 2px 10px}
+#lobbyScr #lb-home .lbcard{flex:0 0 168px;min-height:125px;padding:12px;border-radius:8px;background:#583922;color:#ffe6bd;border:1px solid #9b7042}
+#lobbyScr #lb-home .lbcard strong{font-size:1.02rem}
+#lobbyScr #lb-home .lbcard span:not(.lbic){color:#e8ceab;font-size:.76rem}
+#lobbyScr #lb-home .lbcard .lbic{width:30px;height:30px;border-radius:7px;background:#9f673c;color:#fff4db}
+#lobbyScr #lb-home .lbcard .lbic svg{width:19px;height:19px}
+#lobbyScr #lb-home .notes{flex-basis:225px}
+#lobbyScr #lb-home .notes ul{font-size:.78rem;padding-left:13px;margin:0}
+@media(max-width:900px){
+ #lobbyScr .lb-wrap{grid-template-columns:minmax(190px,270px) minmax(0,1fr);padding:22px;column-gap:14px}
+ #lobbyScr .lb-head{min-height:126px}
+ #lobbyScr .lb-title{font-size:clamp(2.4rem,7vw,4rem)}
+ #lobbyScr .lb-nav button{padding-left:54px;min-height:56px}
+ #lobbyScr .lb-nav button::before{left:15px}
+ #lobbyScr .lb-main{max-height:calc(100dvh - 180px)}
+}
+@media(max-width:650px){
+ #lobbyScr{overflow-y:auto}
+ #lobbyScr .lb-scene{background-position:61% center}
+ #lobbyScr::before{background:linear-gradient(180deg,#21170fcf 0%,#21170fe0 35%,#21170fbd 70%,#21170fe9 100%)}
+ #lobbyScr .lb-wrap{display:flex;flex-direction:column;gap:18px;padding:18px 15px 30px}
+ #lobbyScr .lb-head{min-height:auto;gap:8px;align-items:center}
+ #lobbyScr .lb-title{font-size:clamp(2.1rem,8vw,3.5rem)}
+ #lobbyScr .lb-title small{font-size:.62rem;letter-spacing:0;margin-top:8px}
+ #lobbyScr .lb-prof{max-width:150px;padding:5px}
+ #lobbyScr .lb-prof .lpn{display:none}
+ #lobbyScr .lb-nav{width:100%;max-width:380px;gap:8px}
+ #lobbyScr .lb-nav button{min-height:46px;padding:9px 15px 9px 52px;font-size:1.12rem}
+ #lobbyScr .lb-main,#lobbyScr .lb-main:has(#lb-home:not([hidden])){width:100%;max-height:none;margin:0;overflow:visible;opacity:1}
+ #lobbyScr #lb-home .lbgrid{max-width:100%}
+}
+@media(prefers-reduced-motion:reduce){#lobbyScr .lb-nav button{transition:none}}
+
+
+/* v0.26.1 corrective pass: prevent source illustration's baked labels from
+   appearing behind functional UI. The left wood-toned backing is intentionally
+   opaque, while the landscape and yak remain unfiltered to the right. */
+#lobbyScr::before{background:linear-gradient(90deg,
+  #302419 0%,#302419 35%,#302419 39%,#302419f8 42%,
+  #302419e2 44%,#3024198c 49%,transparent 55%)}
+#lobbyScr .lb-wrap{grid-template-columns:minmax(260px,370px) minmax(0,1fr);padding:clamp(18px,2.7vw,40px);column-gap:clamp(18px,3vw,46px)}
+#lobbyScr .lb-head{min-height:clamp(140px,20vh,190px)}
+#lobbyScr .lb-title{font-size:clamp(2.6rem,4.6vw,4.65rem);line-height:1;white-space:nowrap}
+#lobbyScr .lb-nav{max-width:340px;gap:clamp(9px,1.2vh,13px)}
+#lobbyScr .lb-nav button{min-height:clamp(51px,7.5vh,69px);border-radius:4px 9px 6px 4px;
+  background:repeating-linear-gradient(174deg,transparent 0 11px,#0000000c 12px 14px,transparent 15px 31px),linear-gradient(174deg,#754626,#4b2b1c 48%,#321b13);
+  border:2px solid #8f5c31;border-left:6px solid #92603d;
+  box-shadow:inset 0 3px 0 #c28b516e,inset 0 -5px 0 #160d08a8,0 5px 0 #190f09,0 8px 15px #0006}
+#lobbyScr .lb-nav button[aria-pressed="true"]{background:linear-gradient(174deg,#c38c47,#97602d 45%,#6a391d);border-color:#d1a061}
+/* Home is a title scene, not a dashboard competing with the mascot.
+   Cards remain in the DOM and their functions are still reachable via navigation. */
+#lobbyScr .lb-main:has(#lb-home:not([hidden])){display:none}
+#lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))){align-self:start;max-height:calc(100dvh - 170px);margin-right:2vw;
+  background:color-mix(in srgb,var(--panel) 95%,transparent);box-shadow:0 14px 45px #0008}
+@media(max-width:900px){
+ #lobbyScr .lb-wrap{grid-template-columns:minmax(210px,290px) minmax(0,1fr)}
+ #lobbyScr .lb-title{font-size:clamp(2.35rem,5vw,3.45rem)}
+}
+@media(max-width:650px){
+ #lobbyScr::before{background:linear-gradient(180deg,#302419f2 0%,#302419df 38%,#3024196b 70%,#302419e0 100%)}
+ #lobbyScr .lb-wrap{display:flex;gap:14px;padding:16px}
+ #lobbyScr .lb-head{min-height:auto}
+ #lobbyScr .lb-nav{max-width:310px}
+ #lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))){max-height:none;margin:0}
+}
+
+
+/* v0.26.2: desktop lobby topics replace oversized internal rule scrolling. */
+#lobbyScr .lb-wrap{height:100dvh;min-height:0;grid-template-rows:auto minmax(0,1fr);overflow:hidden}
+#lobbyScr .lb-head{min-height:clamp(108px,16vh,155px)}
+#lobbyScr .lb-nav{gap:clamp(6px,1vh,10px)}
+#lobbyScr .lb-nav button{min-height:clamp(44px,6.4vh,60px);padding-top:8px;padding-bottom:8px}
+#lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))){max-height:100%;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+#lobbyScr .lb-main{padding:clamp(12px,1.5vw,22px)}
+#lobbyScr #lb-rules .rintro{margin-bottom:9px}
+#lobbyScr #lb-rules .rintro p{margin:3px 0}
+#lobbyScr #lb-rules .rule-tabs{display:flex;flex-wrap:wrap;gap:7px;margin:9px 0 14px}
+#lobbyScr #lb-rules .rule-tabs button{color:var(--ink);background:var(--chip);border:1px solid var(--line);border-radius:9px;padding:8px 11px;font:700 .9rem Alegreya,Georgia,serif;cursor:pointer}
+#lobbyScr #lb-rules .rule-tabs button[aria-selected="true"]{background:#a16a39;color:#fff6e5;border-color:#d5a56c}
+#lobbyScr #lb-rules .rule-tabs button:focus-visible{outline:2px solid #f1b65f;outline-offset:3px}
+#lobbyScr #lb-rules .rgrid2{grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;align-items:start}
+#lobbyScr #lb-rules .rcard{font-size:clamp(.79rem,.88vw,.92rem);padding:10px 11px;line-height:1.35}
+#lobbyScr #lb-rules .rcard[hidden]{display:none!important}
+#lobbyScr #lb-rules .rcard h4{font-size:1rem}
+#lobbyScr #lb-rules .rcard li{margin:2px 0}
+@media(max-width:1250px){#lobbyScr #lb-rules .rgrid2{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:900px){#lobbyScr .lb-wrap{padding:16px}#lobbyScr .lb-head{min-height:105px}#lobbyScr #lb-rules .rgrid2{grid-template-columns:1fr 1fr}}
+@media(max-width:650px){#lobbyScr .lb-wrap{height:auto;min-height:100dvh;overflow:visible}#lobbyScr #lb-rules .rgrid2{grid-template-columns:1fr}#lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))){max-height:none;overflow:visible}}
+@media(max-height:650px) and (min-width:651px){#lobbyScr .lb-head{min-height:80px}#lobbyScr .lb-nav button{min-height:38px}#lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))){overflow-y:auto}}
+
+
+/* v0.26.3: fuller scenic background and lighter floating submenu panels. */
+#lobbyScr::before{background:linear-gradient(90deg,
+  #2e2116f2 0%, #2e2116ef 17%, #2e2116e2 24%, #2e2116c0 30%,
+  #2e21168c 35%, #2e211645 41%, transparent 49%)}
+#lobbyScr .lb-wrap{grid-template-columns:minmax(220px,300px) minmax(0,1fr);column-gap:clamp(14px,2vw,34px);padding:clamp(18px,2.3vw,34px)}
+#lobbyScr .lb-head{min-height:clamp(96px,14vh,142px)}
+#lobbyScr .lb-title{font-size:clamp(2.45rem,4.6vw,4.55rem)}
+#lobbyScr .lb-nav{max-width:300px;align-self:center;padding-bottom:clamp(10px,2vh,22px)}
+#lobbyScr .lb-nav button{min-height:clamp(42px,5.9vh,56px);padding-left:64px;font-size:clamp(1rem,1.28vw,1.22rem)}
+#lobbyScr .lb-nav button::before{left:18px}
+#lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))){
+  justify-self:start;align-self:center;
+  width:min(860px,calc(100vw - 390px));max-width:860px;max-height:min(76dvh,760px);
+  margin:0 0 0 clamp(0px,1.2vw,18px);
+  background:linear-gradient(180deg,rgba(38,28,21,.84),rgba(30,22,18,.78));
+  color:#f4ead9;border:1px solid rgba(220,182,129,.22);
+  box-shadow:0 20px 52px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.06);
+  backdrop-filter:blur(13px);
+}
+#lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))) h3,
+#lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))) h4,
+#lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))) p,
+#lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))) label,
+#lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))) li,
+#lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))) div,
+#lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))) span{color:inherit}
+#lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))) .m,
+#lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))) .hint,
+#lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))) small,
+#lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))) .sub{color:#dbc7a8}
+#lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))) .row select,
+#lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))) .row input,
+#lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))) select,
+#lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))) input[type="text"]{
+  background:rgba(255,248,236,.9); color:#2d241d;
+}
+#lobbyScr #lb-rules .rcard,
+#lobbyScr #lb-rules .costs,
+#lobbyScr #lb-rules .turnlist,
+#lobbyScr #lb-rules .winlist{background:rgba(255,255,255,.08);border-color:rgba(238,205,160,.18)}
+#lobbyScr #lb-rules .rule-tabs button{background:rgba(255,255,255,.08);border-color:rgba(238,205,160,.18);color:#f5ead7}
+#lobbyScr #lb-rules .rule-tabs button[aria-selected="true"]{background:#a8743f;color:#fff8eb;border-color:#ddb177}
+@media (min-width:651px){
+  #lobbyScr .lb-main:has(#lb-home:not([hidden])){display:none!important}
+}
+@media (max-width:1100px){
+  #lobbyScr::before{background:linear-gradient(90deg,#2e2116f2 0%,#2e2116ee 24%,#2e2116cf 33%,#2e21166e 41%,transparent 52%)}
+  #lobbyScr .lb-wrap{grid-template-columns:minmax(210px,270px) minmax(0,1fr)}
+  #lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))){width:min(760px,calc(100vw - 330px))}
+}
+@media (max-width:900px){
+  #lobbyScr .lb-wrap{grid-template-columns:minmax(190px,250px) minmax(0,1fr);column-gap:14px;padding:16px}
+  #lobbyScr .lb-title{font-size:clamp(2.1rem,4.8vw,3.3rem)}
+  #lobbyScr .lb-nav{max-width:250px}
+  #lobbyScr .lb-nav button{padding-left:56px}
+  #lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))){width:min(700px,calc(100vw - 292px));max-height:min(74dvh,700px)}
+}
+@media (max-width:650px){
+  #lobbyScr::before{background:linear-gradient(180deg,#2e2116ea 0%,#2e2116d6 22%,#2e2116a3 48%,#2e211673 70%,#2e2116d8 100%)}
+  #lobbyScr .lb-wrap{height:auto;min-height:100dvh;display:flex;gap:14px;padding:16px;overflow:visible}
+  #lobbyScr .lb-nav{max-width:330px;padding-bottom:0;align-self:flex-start}
+  #lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))){width:100%;max-width:none;max-height:none;margin:0;overflow:visible}
+}
+@media (max-height:720px) and (min-width:651px){
+  #lobbyScr .lb-head{min-height:76px}
+  #lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))){max-height:78dvh}
+}
+
+/* v0.26.4 — clean scenic plate, navigation alignment and final lobby surfaces. */
+#lobbyScr .lb-scene{background-image:url('../assets/main-menu-yak.png');background-size:cover;background-position:center center}
+/* No source artwork needs concealing now. Keep a modest readable area behind the buttons. */
+#lobbyScr::before{background:linear-gradient(90deg,rgba(25,20,16,.77) 0%,rgba(29,23,18,.61) 18%,rgba(31,23,18,.28) 32%,rgba(31,23,18,0) 49%)}
+#lobbyScr .lb-wrap{grid-template-columns:minmax(220px,300px) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);row-gap:0;column-gap:clamp(14px,2vw,32px);padding:clamp(18px,2vw,32px)}
+#lobbyScr .lb-head{min-height:clamp(98px,13.5vh,136px)}
+#lobbyScr .lb-title{font-size:clamp(2.5rem,4.25vw,4.35rem);letter-spacing:.04em}
+#lobbyScr .lb-title small{margin-top:10px}
+#lobbyScr .lb-nav{grid-column:1;grid-row:2;align-self:start;width:100%;max-width:300px;gap:clamp(8px,1.05vh,12px);padding:0}
+#lobbyScr .lb-nav button{min-height:clamp(46px,6.3vh,60px);font-size:clamp(1.08rem,1.4vw,1.27rem);background:linear-gradient(171deg,#774c2d,#4e2c1c 54%,#301b14);border-color:#a36f43;box-shadow:inset 0 2px 0 #dba66c59,inset 0 -4px 0 #1e100a7a,0 4px 0 #1c100b,0 6px 12px #0005}
+#lobbyScr .lb-nav button[aria-pressed="true"]{background:linear-gradient(172deg,#cf984e,#a56633 54%,#754422);border-color:#e6b77a}
+#lobbyScr .lb-prof{background:linear-gradient(160deg,rgba(81,52,32,.93),rgba(40,28,22,.93));border-color:#b18b5d}
+#lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))){align-self:start;justify-self:start;width:min(880px,100%);max-width:880px;max-height:calc(100dvh - clamp(98px,13.5vh,136px) - 2.2rem);overflow-y:auto;margin:0;background:rgba(32,24,20,.86);color:#f3e7d6;backdrop-filter:blur(15px);border:1px solid rgba(230,192,147,.32);box-shadow:0 18px 52px #130b0969;border-radius:16px}
+#lobbyScr .lb-main:has(#lb-home:not([hidden])){display:none!important}
+#lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))) .rcard{background:rgba(255,255,255,.075)}
+@media(max-width:1100px){
+ #lobbyScr::before{background:linear-gradient(90deg,rgba(25,20,16,.83),rgba(29,23,18,.65) 24%,rgba(31,23,18,.22) 42%,transparent 57%)}
+ #lobbyScr .lb-wrap{grid-template-columns:minmax(210px,260px) minmax(0,1fr)}
+ #lobbyScr .lb-nav{max-width:260px}
+}
+@media(max-width:900px){
+ #lobbyScr .lb-wrap{grid-template-columns:minmax(180px,230px) minmax(0,1fr);padding:16px}
+ #lobbyScr .lb-head{min-height:105px}
+ #lobbyScr .lb-nav{max-width:230px}
+ #lobbyScr .lb-nav button{padding-left:53px;min-height:46px}
+ #lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))){max-height:calc(100dvh - 125px)}
+}
+@media(max-width:650px){
+ #lobbyScr .lb-scene{background-position:68% center}
+ #lobbyScr::before{background:linear-gradient(180deg,rgba(25,20,16,.79),rgba(25,20,16,.48) 48%,rgba(25,20,16,.25) 100%)}
+ #lobbyScr .lb-wrap{display:flex;flex-direction:column;height:auto;min-height:100dvh;overflow:visible;gap:14px;padding:16px}
+ #lobbyScr .lb-head{min-height:0}
+ #lobbyScr .lb-nav{width:100%;max-width:300px;gap:8px}
+ #lobbyScr .lb-nav button{min-height:43px}
+ #lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))){width:100%;max-height:none;overflow:visible;margin:0}
+}
+@media(max-height:670px) and (min-width:651px){
+ #lobbyScr .lb-head{min-height:82px}
+ #lobbyScr .lb-nav{gap:5px}
+ #lobbyScr .lb-nav button{min-height:38px;padding-top:6px;padding-bottom:6px}
+ #lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))){max-height:calc(100dvh - 100px)}
+}
+
+
+/* v0.26.6: fresh separate brand/logo treatment over the clean scenic background. */
+#lobbyScr::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(90deg,rgba(18,14,12,.54) 0%,rgba(18,14,12,.38) 16%,rgba(18,14,12,.12) 28%,rgba(18,14,12,0) 42%)}
+#lobbyScr .lb-wrap{grid-template-columns:minmax(230px,310px) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);column-gap:clamp(18px,2.1vw,34px);row-gap:0;padding:clamp(18px,2.1vw,34px)}
+#lobbyScr .lb-head{grid-column:1/-1;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;min-height:0;margin-bottom:12px}
+#lobbyScr .lb-brand{display:flex;flex-direction:column;align-items:flex-start;gap:10px;max-width:min(410px,42vw)}
+#lobbyScr .lb-title{position:relative;display:inline-flex;align-items:flex-end;justify-content:center;padding:70px 26px 18px;min-width:min(385px,42vw);min-height:118px;background:linear-gradient(180deg,rgba(64,43,30,.95),rgba(44,30,22,.94));border:1px solid rgba(214,172,120,.28);border-radius:0 0 18px 18px;box-shadow:0 18px 40px rgba(0,0,0,.26), inset 0 1px 0 rgba(255,255,255,.08)}
+#lobbyScr .lb-title::before{content:"";position:absolute;left:16px;right:16px;top:10px;height:68px;background:linear-gradient(180deg,#9a6d44,#6d472d);clip-path:polygon(0 100%,14% 42%,25% 62%,36% 16%,50% 0,64% 18%,75% 60%,87% 40%,100% 100%);border-radius:14px 14px 8px 8px;box-shadow:inset 0 2px 0 rgba(255,255,255,.2),0 8px 10px rgba(0,0,0,.14)}
+#lobbyScr .lb-title::after{content:"";position:absolute;left:22px;right:22px;bottom:-14px;height:22px;background:linear-gradient(180deg,#5b3d2b,#34231a);clip-path:polygon(0 0,100% 0,92% 100%,8% 100%);border-radius:0 0 12px 12px;box-shadow:0 10px 18px rgba(0,0,0,.24)}
+#lobbyScr .lb-title-text{position:relative;z-index:1;display:block;font:700 clamp(2.55rem,4.4vw,4.3rem)/.86 Alegreya,Georgia,serif;letter-spacing:.045em;color:#f6d8a5;text-transform:uppercase;text-shadow:0 1px 0 #fff3cf,0 4px 0 #9a6335,0 6px 0 #6d4526,0 10px 18px rgba(0,0,0,.44)}
+#lobbyScr .lb-tagline{padding-left:10px;font:700 .78rem/1.2 'Alegreya Sans',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#f8e1b9;text-shadow:0 1px 4px rgba(0,0,0,.55)}
+#lobbyScr .lb-prof{background:linear-gradient(160deg,rgba(81,52,32,.93),rgba(40,28,22,.93));border-color:#b18b5d}
+#lobbyScr .lb-nav{grid-column:1;grid-row:2;align-self:start;max-width:300px;width:100%;gap:10px;padding-top:4px}
+#lobbyScr .lb-nav button{min-height:54px;padding:10px 18px 10px 60px;border-radius:10px;position:relative;font:700 clamp(1.05rem,1.25vw,1.25rem)/1.2 Alegreya,Georgia,serif;color:#f7e6c8;background:linear-gradient(175deg,rgba(108,67,40,.96),rgba(70,41,26,.96) 54%,rgba(45,25,18,.96));border:1px solid rgba(181,131,80,.9);box-shadow:inset 0 1px 0 rgba(255,255,255,.18), inset 0 -3px 0 rgba(27,14,10,.48), 0 7px 18px rgba(0,0,0,.22);text-shadow:0 1px 2px rgba(0,0,0,.55);transition:transform .16s ease,filter .16s ease,background .16s ease}
+#lobbyScr .lb-nav button:hover{transform:translateX(4px);filter:brightness(1.06)}
+#lobbyScr .lb-nav button[aria-pressed="true"]{background:linear-gradient(175deg,rgba(201,145,73,.98),rgba(149,91,45,.98) 54%,rgba(104,60,29,.98));border-color:#e4b87b;color:#fff6e7}
+#lobbyScr .lb-nav button::before{left:18px;color:#f2d5a0;font-size:22px}
+#lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))){align-self:start;justify-self:start;width:min(880px,100%);max-width:880px;max-height:calc(100dvh - 170px);overflow-y:auto;margin:0;background:rgba(32,24,20,.84);color:#f3e7d6;backdrop-filter:blur(15px);border:1px solid rgba(230,192,147,.32);box-shadow:0 18px 52px rgba(19,11,9,.41);border-radius:16px}
+#lobbyScr .lb-main:has(#lb-home:not([hidden])){display:none!important}
+#lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))) .rcard{background:rgba(255,255,255,.075)}
+@media (max-width:1100px){
+  #lobbyScr .lb-wrap{grid-template-columns:minmax(215px,270px) minmax(0,1fr)}
+  #lobbyScr .lb-title{min-width:310px;padding:60px 20px 16px}
+  #lobbyScr .lb-title::before{height:60px}
+  #lobbyScr .lb-title-text{font-size:clamp(2.15rem,4.8vw,3.35rem)}
+  #lobbyScr .lb-nav{max-width:270px}
+  #lobbyScr .lb-nav button{min-height:50px;padding-left:54px}
+}
+@media (max-width:760px){
+  #lobbyScr .lb-wrap{display:flex;flex-direction:column;gap:14px;padding:16px;min-height:100dvh;height:auto;overflow:visible}
+  #lobbyScr .lb-head{margin-bottom:0}
+  #lobbyScr .lb-brand{max-width:min(100%,360px)}
+  #lobbyScr .lb-title{min-width:0;width:100%;padding:54px 18px 14px}
+  #lobbyScr .lb-title::before{height:52px;left:12px;right:12px;top:10px}
+  #lobbyScr .lb-title-text{font-size:clamp(2rem,9vw,3rem)}
+  #lobbyScr .lb-tagline{font-size:.66rem;letter-spacing:.1em}
+  #lobbyScr .lb-nav{max-width:320px;gap:8px;padding-top:0}
+  #lobbyScr .lb-nav button{min-height:46px;font-size:1.08rem}
+  #lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))){width:100%;max-height:none;overflow:visible}
+}
+@media (max-height:760px) and (min-width:761px){
+  #lobbyScr .lb-title{padding-top:58px;min-height:108px}
+  #lobbyScr .lb-nav button{min-height:48px}
+  #lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))){max-height:calc(100dvh - 156px)}
+}
+
+
+/* v0.26.7: rugged unified menu region and more handcrafted Highhorn branding. */
+#lobbyScr::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(90deg,rgba(19,14,11,.50) 0%,rgba(19,14,11,.34) 18%,rgba(19,14,11,.10) 30%,rgba(19,14,11,0) 44%)}
+#lobbyScr .lb-wrap{grid-template-columns:minmax(250px,330px) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);column-gap:clamp(18px,2.2vw,36px);row-gap:0;padding:clamp(18px,2vw,34px);min-height:100dvh;height:100dvh;overflow:hidden}
+#lobbyScr .lb-side{grid-column:1;grid-row:1 / span 2;align-self:start;display:flex;flex-direction:column;gap:14px;max-width:330px;position:relative;padding-right:8px}
+#lobbyScr .lb-side::before{content:"";position:absolute;inset:-12px 14px -18px -10px;background:linear-gradient(180deg,rgba(42,27,19,.28),rgba(24,16,12,.20));border:1px solid rgba(203,159,105,.10);border-radius:18px;clip-path:polygon(0 4%,72% 0,100% 8%,100% 95%,78% 100%,0 96%);box-shadow:0 20px 40px rgba(0,0,0,.12);backdrop-filter:blur(5px);pointer-events:none}
+#lobbyScr .lb-head{grid-column:2;grid-row:1;display:flex;justify-content:flex-end;align-items:flex-start;min-height:0;margin:0 0 10px 0}
+#lobbyScr .lb-brand{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:12px 8px 2px 0;z-index:1}
+#lobbyScr .lb-title{position:relative;display:inline-flex;align-items:flex-end;justify-content:flex-start;min-width:300px;max-width:100%;padding:54px 18px 18px 18px;background:transparent;border:none;box-shadow:none}
+#lobbyScr .lb-title::before{content:"";position:absolute;left:0;right:0;bottom:8px;height:74px;background:linear-gradient(180deg,#625247,#40342d 44%,#271f1b);clip-path:polygon(3% 18%,12% 0,27% 11%,45% 0,68% 11%,86% 2%,98% 20%,98% 80%,92% 96%,8% 100%,0 84%,0 22%);box-shadow:0 16px 26px rgba(0,0,0,.23), inset 0 1px 0 rgba(255,255,255,.1)}
+#lobbyScr .lb-title::after{content:"";position:absolute;left:26px;right:24px;top:4px;height:60px;background:linear-gradient(180deg,#9d7147,#775233);clip-path:polygon(2% 100%,16% 38%,26% 57%,39% 12%,50% 0,63% 20%,74% 52%,89% 34%,98% 100%);filter:drop-shadow(0 6px 5px rgba(0,0,0,.18))}
+#lobbyScr .lb-title-text{position:relative;z-index:2;display:block;font:700 clamp(2.8rem,4.2vw,4.45rem)/.82 Alegreya,Georgia,serif;letter-spacing:.038em;color:#f0d1a0;text-transform:uppercase;text-shadow:0 1px 0 #fff0d0,0 3px 0 #9b6a3d,0 5px 0 #6f492b,0 10px 16px rgba(0,0,0,.46)}
+#lobbyScr .lb-tagline{position:relative;z-index:1;padding-left:14px;font:700 .79rem/1.2 'Alegreya Sans',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#f0ddbf;text-shadow:0 1px 4px rgba(0,0,0,.55)}
+#lobbyScr .lb-nav{display:flex;flex-direction:column;gap:10px;max-width:300px;width:100%;padding:0;position:relative;z-index:1}
+#lobbyScr .lb-nav button{position:relative;min-height:52px;padding:10px 16px 10px 58px;text-align:left;font:700 clamp(1.03rem,1.2vw,1.22rem)/1.18 Alegreya,Georgia,serif;color:#f7e8cf;background:linear-gradient(180deg,rgba(112,71,42,.96),rgba(77,47,30,.96) 54%,rgba(55,32,22,.98));border:1px solid rgba(181,131,80,.92);border-radius:12px;clip-path:polygon(0 10px,10px 0,calc(100% - 18px) 0,100% 12px,100% calc(100% - 10px),calc(100% - 8px) 100%,0 100%,0 46%);box-shadow:inset 0 1px 0 rgba(255,255,255,.16), inset 0 -3px 0 rgba(26,15,10,.46), 0 7px 14px rgba(0,0,0,.18);text-shadow:0 1px 2px rgba(0,0,0,.6);transition:transform .16s ease,filter .16s ease,background .16s ease}
+#lobbyScr .lb-nav button::before{left:18px;color:#f5d9a9;font-size:21px;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+#lobbyScr .lb-nav button::after{content:"";position:absolute;right:10px;top:9px;bottom:9px;width:4px;border-radius:3px;background:linear-gradient(180deg,rgba(255,255,255,.10),rgba(0,0,0,.10));opacity:.55}
+#lobbyScr .lb-nav button:hover{transform:translateX(4px);filter:brightness(1.05)}
+#lobbyScr .lb-nav button[aria-pressed="true"]{background:linear-gradient(180deg,rgba(203,147,77,.99),rgba(152,95,48,.98) 56%,rgba(111,67,34,.98));border-color:#e6ba7e;color:#fff8ee}
+#lobbyScr .lb-prof{background:linear-gradient(160deg,rgba(81,52,32,.93),rgba(40,28,22,.93));border-color:#b18b5d;box-shadow:0 8px 20px rgba(0,0,0,.18)}
+#lobbyScr .lb-main{grid-column:2;grid-row:2;align-self:start;justify-self:start}
+#lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))){width:min(880px,100%);max-width:880px;max-height:calc(100dvh - 132px);overflow-y:auto;margin:0;background:rgba(31,23,19,.84);color:#f3e7d6;backdrop-filter:blur(15px);border:1px solid rgba(230,192,147,.32);box-shadow:0 18px 52px rgba(19,11,9,.41);border-radius:16px}
+#lobbyScr .lb-main:has(#lb-home:not([hidden])){display:none!important}
+#lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))) .rcard{background:rgba(255,255,255,.075)}
+@media (max-width:1150px){
+  #lobbyScr .lb-wrap{grid-template-columns:minmax(220px,285px) minmax(0,1fr)}
+  #lobbyScr .lb-side{max-width:285px}
+  #lobbyScr .lb-title{min-width:0;padding-top:50px}
+  #lobbyScr .lb-title-text{font-size:clamp(2.25rem,4.2vw,3.55rem)}
+  #lobbyScr .lb-nav{max-width:270px}
+}
+@media (max-width:820px){
+  #lobbyScr .lb-wrap{grid-template-columns:minmax(185px,245px) minmax(0,1fr);padding:16px;column-gap:16px}
+  #lobbyScr .lb-side{max-width:245px}
+  #lobbyScr .lb-title{padding:44px 12px 14px 8px}
+  #lobbyScr .lb-title::before{height:65px}
+  #lobbyScr .lb-title::after{left:18px;right:18px;height:52px}
+  #lobbyScr .lb-nav{max-width:230px;gap:8px}
+  #lobbyScr .lb-nav button{min-height:46px;padding-left:50px;font-size:1.02rem}
+  #lobbyScr .lb-nav button::before{left:15px}
+  #lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))){max-height:calc(100dvh - 118px)}
+}
+@media (max-width:760px){
+  #lobbyScr::before{background:linear-gradient(180deg,rgba(19,14,11,.54) 0%,rgba(19,14,11,.24) 32%,rgba(19,14,11,.08) 50%,rgba(19,14,11,.36) 100%)}
+  #lobbyScr .lb-wrap{display:flex;flex-direction:column;gap:14px;padding:16px;min-height:100dvh;height:auto;overflow:visible}
+  #lobbyScr .lb-side{max-width:320px;padding-right:0}
+  #lobbyScr .lb-side::before{display:none}
+  #lobbyScr .lb-head{justify-content:flex-start}
+  #lobbyScr .lb-title{width:100%;min-width:0;padding:46px 12px 14px 10px}
+  #lobbyScr .lb-title-text{font-size:clamp(2.1rem,9vw,3.1rem)}
+  #lobbyScr .lb-tagline{font-size:.66rem;letter-spacing:.1em}
+  #lobbyScr .lb-nav{max-width:320px}
+  #lobbyScr .lb-main:not(:has(#lb-home:not([hidden]))){width:100%;max-height:none;overflow:visible}
+}
+
+/* v0.26.8: independent transparent 3D logo; remove artificial mountain and gray sidebar backing. */
+#lobbyScr .lb-side::before{display:none!important}
+#lobbyScr .lb-side{gap:12px;padding-right:0}
+#lobbyScr .lb-brand{padding:0;gap:4px;max-width:100%;width:100%}
+#lobbyScr .lb-title{display:none}
+#lobbyScr .lb-logo-image{display:block;width:100%;max-width:330px;height:auto;object-fit:contain;filter:drop-shadow(0 7px 9px rgba(14,8,4,.40))}
+#lobbyScr .lb-tagline{padding-left:8px;margin:0 0 5px;font-size:clamp(.62rem,.7vw,.75rem);letter-spacing:.075em;color:#f6e5ce}
+#lobbyScr .lb-nav{gap:clamp(7px,1vh,10px)}
+#lobbyScr::before{background:linear-gradient(90deg,rgba(15,11,9,.47) 0%,rgba(15,11,9,.23) 17%,rgba(15,11,9,.06) 29%,transparent 42%)}
+@media (max-width:1150px){#lobbyScr .lb-logo-image{max-width:285px}}
+@media (max-width:820px){#lobbyScr .lb-logo-image{max-width:245px}}
+@media (max-width:760px){#lobbyScr .lb-logo-image{max-width:320px}#lobbyScr .lb-tagline{font-size:.67rem}}

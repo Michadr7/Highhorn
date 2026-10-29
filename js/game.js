@@ -2397,6 +2397,46 @@ function renderRules(){
     ${sec('wolf','Events',`<p>With night rules on, wolves and bandits only come at night and leave at dawn. A full day passes every 6 rounds.</p><p>Rolling 2 or 12 brings an event: wolves on a pasture, bandits in the hills, storms on the lakes, floods, or a lucky event for one kind of hero. Event cards show what is happening and how long it lasts.</p>`)}
     ${sec('fish','Fishing and lakes',`<p>Each lake has a number. A city beside a lake catches 1 fish on its roll; a fisherman adds 1 more. Fish pays for army marches and trades like any resource, but is not used to build.</p>`)}
     </div>`;
+  // A small set of topic pages avoids a second scrollbar in the desktop lobby.
+  // Keep the original rule cards in the DOM, so their contents remain searchable
+  // and fully accessible when the appropriate topic is selected.
+  const ruleGroups=[
+    {name:'Getting started',ids:[0,1,2]},
+    {name:'Building & trade',ids:[3,4,8]},
+    {name:'Battles',ids:[5]},
+    {name:'Heroes & events',ids:[6,7]},
+  ];
+  const ruleGrid=$('#lb-rules .rgrid2');
+  const ruleCards=Array.from(ruleGrid.children);
+  const ruleTabs=document.createElement('div');
+  ruleTabs.className='rule-tabs';
+  ruleTabs.setAttribute('role','tablist');
+  ruleTabs.setAttribute('aria-label','How to play topics');
+  const chooseRuleGroup=(selected,focus=false)=>{
+    ruleTabs.querySelectorAll('button').forEach((b,i)=>{
+      const active=i===selected;
+      b.setAttribute('aria-selected',String(active));
+      b.tabIndex=active?0:-1;
+      if(active&&focus)b.focus();
+    });
+    ruleCards.forEach((card,i)=>{card.hidden=!ruleGroups[selected].ids.includes(i);});
+    const main=$('#lobbyScr .lb-main');
+    if(main)main.scrollTop=0;
+  };
+  ruleGroups.forEach((group,i)=>{
+    const button=document.createElement('button');
+    button.type='button';button.setAttribute('role','tab');
+    button.textContent=group.name;
+    button.addEventListener('click',()=>chooseRuleGroup(i));
+    button.addEventListener('keydown',event=>{
+      if(event.key!=='ArrowRight'&&event.key!=='ArrowLeft')return;
+      event.preventDefault();
+      chooseRuleGroup((i+(event.key==='ArrowRight'?1:ruleGroups.length-1))%ruleGroups.length,true);
+    });
+    ruleTabs.append(button);
+  });
+  ruleGrid.before(ruleTabs);
+  chooseRuleGroup(0);
   $('#tipsOn').addEventListener('change',e=>{profile.tipsOff=!e.target.checked;saveProfile();});
   $('#tipsReset').addEventListener('click',()=>{profile.tipsSeen={};profile.tipsOff=false;saveProfile();$('#tipsOn').checked=true;toast('Tips will show again in your next game.');});
 }
