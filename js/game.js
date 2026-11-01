@@ -659,6 +659,7 @@ function portraitRig(){
   return PR;
 }
 function heroPortrait(L,css,ability,expr){
+  if(L&&L.model==='male-commoner') return 'Models/Heroes/MaleCommoner/portrait.png';
   const P=portraitRig(); if(!P) return null;
   const key=JSON.stringify([L||{},css,ability||'',expr]); if(prCache[key]) return prCache[key];
   if(P.size!==192){P.r.setSize(192,192,false);P.size=192;}
@@ -1018,7 +1019,7 @@ function animate(){
     smokeIM.count=i; smokeIM.instanceMatrix.needsUpdate=true;
   }
   for(let i=anims.length-1;i>=0;i--){const a=anims[i];if(now<a.t0) continue;const k=Math.min(1,(now-a.t0)/a.dur);a.fn(k);if(k>=1){anims.splice(i,1);a.done&&a.done();}}
-  renderer.render(scene,camera);
+  if($('#lobbyScr').hidden||lbSec!=='hero'||!draft||draft.look.model!=='male-commoner') renderer.render(scene,camera);
 }
 
 /* =====================================================================
@@ -2465,8 +2466,9 @@ function showLobby(sec){
   $('#lobbyScr').hidden=false; controls.autoRotate=!reduceMotion(); controls.autoRotateSpeed=0.5; setMenu(false);
   renderLobby(sec||'home');
 }
-function hideLobby(){$('#lobbyScr').hidden=true;controls.autoRotate=false;}
+function hideLobby(){HighhornCommoner.suspend();$('#lobbyScr').hidden=true;controls.autoRotate=false;}
 function renderLobby(sec){
+  if(sec!=='hero') HighhornCommoner.suspend();
   lbSec=sec;
   document.querySelectorAll('#lbNav button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.sec===sec)));
   ['home','play','hero','profile','rules','online'].forEach(k=>$('#lb-'+k).hidden=k!==sec);
@@ -2579,21 +2581,26 @@ let draft=null;
 function renderCreator(){
   if(!draft) draft=JSON.parse(JSON.stringify(profile.hero));
   const L=draft.look, css=colorCss(profile.color), lvl=levelInfo(profile.xp).lvl;
+  if(!L.model) L.model='male-commoner';
+  const commoner=L.model==='male-commoner';
+  if(!commoner) HighhornCommoner.suspend();
   const lockOf=(kind,id)=>UNLOCKS.find(u=>u.kind===kind&&u.id===id);
   const outfits=[...BASE_OUTFITS,...UNLOCKS.filter(u=>u.kind==='outfit').map(u=>u.id)];
   const sigils=[...SIGILS,...UNLOCKS.filter(u=>u.kind==='sigil').map(u=>u.id)];
-  $('#lb-hero').innerHTML=`<div class="creator">
-    <div class="cprev"><div class="bigav">${portraitRig()?'<canvas id="hero3d" width="360" height="360" aria-label="Your hero, turning slowly"></canvas>':avatarFrom(L,css,'smile',draft.ability)}</div><canvas id="cflag" width="120" height="84"></canvas>
+  $('#lb-hero').innerHTML=`<div class="creator${commoner?' creator--commoner':''}">
+    <div class="cprev">${commoner?'<div id="commonerMount"></div>':`<div class="bigav">${portraitRig()?'<canvas id="hero3d" width="360" height="360" aria-label="Your hero, turning slowly"></canvas>':avatarFrom(L,css,'smile',draft.ability)}</div>`}<canvas id="cflag" width="120" height="84"></canvas>
       <p class="m">${draft.name} the ${ABILITIES[draft.ability].name}</p><button class="btn" id="crand">Randomize</button></div>
     <div class="cform">
+      <label class="lbl" for="cmodel">Character</label><select id="cmodel"><option value="male-commoner" ${commoner?'selected':''}>Male Commoner · Level 1</option><option value="prototype" ${!commoner?'selected':''}>Original prototype</option></select>
+      ${commoner?'<p class="m commoner-outfit-note">A medieval tunic, trousers, boots and shoulder garment. Customize your name, banner and ability below.</p>':''}
       <label class="lbl" for="cname">Hero name</label><input id="cname" type="text" maxlength="16" value="${draft.name.replace(/"/g,'')}">
       <p class="lbl">Favorite color (used when it's free)</p><div class="swrow">${PALETTE.map(c=>`<button class="swb" data-fc="${c.name}" aria-pressed="${c.name===profile.color}" title="${c.name}" style="background:${c.css}"></button>`).join('')}</div>
-      <p class="lbl">Outfit</p><div class="swrow">${outfits.map(o=>{const u=o&&lockOf('outfit',o),lk=u&&lvl<u.lvl;return `<button class="swb${lk?' locked':''}" data-of="${o||''}" aria-pressed="${(L.outfit||null)===o}" ${lk?`disabled title="${u.name}: unlocks at level ${u.lvl}"`:`title="${o?'Outfit':'Team color'}"`} style="background:${o||css}">${o?'':'<small>team</small>'}</button>`;}).join('')}</div>
+      <div class="legacy-appearance" ${commoner?'hidden':''}><p class="lbl">Outfit</p><div class="swrow">${outfits.map(o=>{const u=o&&lockOf('outfit',o),lk=u&&lvl<u.lvl;return `<button class="swb${lk?' locked':''}" data-of="${o||''}" aria-pressed="${(L.outfit||null)===o}" ${lk?`disabled title="${u.name}: unlocks at level ${u.lvl}"`:`title="${o?'Outfit':'Team color'}"`} style="background:${o||css}">${o?'':'<small>team</small>'}</button>`;}).join('')}</div>
       <p class="lbl">Skin</p><div class="swrow">${SKINS.map(c=>`<button class="swb round" data-sk="${c}" aria-pressed="${c===L.skin}" style="background:${c}" title="Skin tone"></button>`).join('')}</div>
       <p class="lbl">Hairstyle</p><div class="swrow">${HAIRSTYLES.map(([k,n])=>`<button class="btn sm" data-hs="${k}" aria-pressed="${(L.hairStyle||'short')===k}">${n}</button>`).join('')}</div>
       <p class="lbl">Headwear and cape</p><div class="swrow">${HEADWEAR.map(([k,n])=>{const u=lockOf('head',k),lk=u&&lvl<u.lvl;return `<button class="btn sm${lk?' locked':''}" data-hw="${k}" aria-pressed="${(L.headwear||'none')===k}" ${lk?`disabled title="${u.name}: unlocks at level ${u.lvl}"`:''}>${n}${lk?' (level '+u.lvl+')':''}</button>`;}).join('')}<button class="btn sm" data-cape="1" aria-pressed="${!!L.cape}">${L.cape?'Cape: on':'Cape: off'}</button></div>
       <p class="lbl">Hair color</p><div class="swrow">${HAIRS.map(c=>`<button class="swb round" data-hr="${c}" aria-pressed="${c===L.hair}" style="background:${c}" title="Hair color"></button>`).join('')}</div>
-      <p class="lbl">Banner</p><div class="swrow">${sigils.map(g=>{const u=lockOf('sigil',g),lk=u&&lvl<u.lvl;return `<button class="swb sigb${lk?' locked':''}" data-sg="${g}" aria-pressed="${g===L.sigil}" ${lk?`disabled title="${u.name}: unlocks at level ${u.lvl}"`:`title="${g}"`}><canvas width="52" height="52" data-sigc="${g}"></canvas></button>`;}).join('')}</div>
+      </div><p class="lbl">Banner</p><div class="swrow">${sigils.map(g=>{const u=lockOf('sigil',g),lk=u&&lvl<u.lvl;return `<button class="swb sigb${lk?' locked':''}" data-sg="${g}" aria-pressed="${g===L.sigil}" ${lk?`disabled title="${u.name}: unlocks at level ${u.lvl}"`:`title="${g}"`}><canvas width="52" height="52" data-sigc="${g}"></canvas></button>`;}).join('')}</div>
       <p class="lbl">Ability</p><div class="abil2">${Object.entries(ABILITIES).map(([k,x])=>`<button data-ab2="${k}" aria-pressed="${k===draft.ability}"><span class="lt" style="background:${x.color}">${x.letter}</span><strong>${x.name}</strong><small>${x.desc}</small></button>`).join('')}</div>
       <div class="mact"><button class="btn" id="cundo">Discard changes</button><button class="primary" id="csave">Save hero</button></div>
     </div></div>`;
@@ -2603,10 +2610,12 @@ function renderCreator(){
   Q('[data-fc]',b=>{profile.color=b.dataset.fc;saveProfile();});
   Q('[data-of]',b=>{L.outfit=b.dataset.of||null;});
   Q('[data-hs]',b=>{L.hairStyle=b.dataset.hs;}); Q('[data-hw]',b=>{L.headwear=b.dataset.hw;}); Q('[data-cape]',()=>{L.cape=!L.cape;});
-  previewHero=buildHero(L,css,draft.ability,'smile');
+  if(commoner){previewHero=null;HighhornCommoner.mount($('#commonerMount'),{reducedMotion:reduceMotion(),quality:uiPrefs.quality});}
+  else previewHero=buildHero(L,css,draft.ability,'smile');
+  $('#cmodel').addEventListener('change',e=>{L.model=e.target.value;renderCreator();});
   Q('[data-sk]',b=>{L.skin=b.dataset.sk;}); Q('[data-hr]',b=>{L.hair=b.dataset.hr;}); Q('[data-sg]',b=>{L.sigil=b.dataset.sg;});
   Q('[data-ab2]',b=>{draft.ability=b.dataset.ab2;});
-  $('#crand').addEventListener('click',()=>{const r=randomHero();draft={name:r.name,ability:r.ability,look:{skin:r.look.skin,hair:r.look.hair,sigil:r.look.sigil,hairStyle:r.look.hairStyle,headwear:r.look.headwear,cape:r.look.cape,outfit:L.outfit}};renderCreator();});
+  $('#crand').addEventListener('click',()=>{const r=randomHero();draft={name:r.name,ability:r.ability,look:{skin:r.look.skin,hair:r.look.hair,sigil:r.look.sigil,hairStyle:r.look.hairStyle,headwear:r.look.headwear,cape:r.look.cape,outfit:L.outfit,model:L.model}};renderCreator();});
   $('#cname').addEventListener('input',e=>{draft.name=e.target.value.trim()||'Hero';});
   $('#cundo').addEventListener('click',()=>{draft=null;renderCreator();});
   $('#csave').addEventListener('click',()=>{profile.hero=JSON.parse(JSON.stringify(draft));saveProfile();draft=null;Snd.play('fanfare');toast(`${profile.hero.name} is saved.`);renderLobby('home');});

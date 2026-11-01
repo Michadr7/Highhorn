@@ -594,3 +594,17 @@ select option,select optgroup{background-color:Canvas;color:CanvasText}
 select option:disabled{color:GrayText}
 .roomcode{font:700 3rem/1 Alegreya,Georgia,serif;letter-spacing:.25em;text-align:center;padding:16px;margin:10px 0;border-radius:14px;background:var(--chip);border:2px dashed var(--accent)}
 .olist div{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)}
+
+/* Accepted Male Commoner: full-body creator preview; original prototype retained. */
+.creator--commoner{grid-template-columns:minmax(280px,380px) minmax(0,1fr)}
+.creator--commoner .cprev{min-width:0;align-self:start;position:sticky;top:12px}
+#commonerMount,.commoner-preview{width:100%}
+.commoner-viewport{width:100%;height:470px;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(ellipse at 50% 35%,#62513e,#29261f);box-shadow:var(--shadow)}
+.commoner-viewport canvas{display:block;width:100%;height:100%;touch-action:none}
+.commoner-status{min-height:1.5em;margin:10px 0 6px;font-size:.85rem}
+.commoner-clips{margin:0;width:100%}
+.commoner-clips button{flex:1}
+.commoner-hint{font-size:.8rem;margin:8px 0 0}
+.commoner-outfit-note{margin:8px 0 18px;font-size:.9rem}
+#cmodel{width:100%;margin-bottom:6px}
+@media(max-width:760px){.creator--commoner{grid-template-columns:1fr}.creator--commoner .cprev{position:static}.commoner-viewport{height:400px}.commoner-preview{max-width:430px;margin:auto}}
