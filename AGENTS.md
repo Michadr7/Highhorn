@@ -47,3 +47,4 @@ Investigate `Scripts/Highhorn_Male_Commoner_Setup.py` and the Blender scene gene
 - The user accepted the browser Hero preview. Defer the standing-pose issue and remaining procedural-character avatars/board pieces until after version reconciliation.
 - Every Git push automatically deploys to `highhorn.ghostjumper007.workers.dev`. Treat all pushes as production deployments; do not push without explicit user instruction. Local comparisons, snapshots and merge preparation must not publish anything.
 - The user requested local servers closed for now. Do not restart them until asked.
+- Reconciled the accepted Commoner integration with confirmed GitHub `main` commit `e403c3eb51676e2a34e829a53c6ea0edd90cf4ff` (v0.26.8) on local branch `work/commoner-on-v0.26.8`. A pre-merge recovery archive is under `Exports/VersionMergeSafety/Snapshot_20261031_192546/`. Complete a browser layout check when the user authorizes reopening the server.
