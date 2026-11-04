@@ -1,0 +1,210 @@
+"""Reopen the style file and compare its preserved data and animated export."""
+import sys, json, hashlib, struct, math
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from Highhorn_Roster_Workbench import *
+
+OUT = ROOT / 'Exports/StyleStudy/2026-11-03/Female_v1'
+build = json.loads((OUT / 'Build_Report.json').read_text())
+NAMES = ['Female_Body', 'Tunic', 'Pants', 'Boots', 'Shoulders']
+
+def sha(data):
+    return hashlib.sha256(data).hexdigest()
+
+def geometry(obj):
+    mesh = obj.data
+    positions = np.empty(len(mesh.vertices) * 3, dtype=np.float32)
+    if mesh.shape_keys:
+        mesh.shape_keys.key_blocks[0].data.foreach_get('co',positions)
+    else:
+        mesh.vertices.foreach_get('co', positions)
+    return {
+        'positions': positions.reshape(-1, 3),
+        'uv': sha(repr([[tuple(p.uv) for p in layer.data] for layer in mesh.uv_layers]).encode()),
+        'weights': sha(repr([[(obj.vertex_groups[g.group].name, g.weight) for g in v.groups] for v in mesh.vertices]).encode()),
+        'topology': sha(repr([tuple(f.vertices) for f in mesh.polygons]).encode()),
+        'matrix': [list(row) for row in obj.matrix_world],
+        'smooth_flags': [f.use_smooth for f in mesh.polygons],
+    }
+
+def skin_images():
+    result = {}
+    for mat in bpy.data.objects['Female_Body'].data.materials:
+        for node in mat.node_tree.nodes:
+            if node.type == 'TEX_IMAGE' and node.image:
+                image = node.image
+                pixels = np.empty(len(image.pixels), dtype=np.float32)
+                image.pixels.foreach_get(pixels)
+                result[image.name] = sha(pixels.tobytes())
+    return result
+
+def skeleton(rig):
+    return repr([(b.name, b.parent.name if b.parent else None,
+                  [list(row) for row in b.matrix_local]) for b in rig.data.bones])
+
+def sample_poses(rig):
+    poses = {}
+    rig.data.pose_position = 'POSE'
+    for track in rig.animation_data.nla_tracks:
+        track.mute = True
+    for clip in ['idle', 'walk', 'run']:
+        action = bpy.data.actions[clip]
+        rig.animation_data.action = action
+        rig.animation_data.action_slot = action.slots[0]
+        start, end = action.frame_range
+        for progress in [0, .25, .5, .75, .999]:
+            frame = start + (end - start) * progress
+            bpy.context.scene.frame_set(math.floor(frame), subframe=frame % 1)
+            depsgraph = bpy.context.evaluated_depsgraph_get()
+            row = {}
+            for name in NAMES:
+                evaluated = bpy.data.objects[name].evaluated_get(depsgraph)
+                mesh = evaluated.to_mesh()
+                coords = np.empty(len(mesh.vertices) * 3, dtype=np.float32)
+                mesh.vertices.foreach_get('co', coords)
+                assert np.isfinite(coords).all(), (name, clip, progress)
+                coords = coords.reshape(-1, 3)[::max(1, len(mesh.vertices) // 500)]
+                matrix = np.array(evaluated.matrix_world)
+                row[name] = coords @ matrix[:3, :3].T + matrix[:3, 3]
+                evaluated.to_mesh_clear()
+            poses[(clip, progress)] = row
+    return poses
+
+bpy.ops.wm.open_mainfile(filepath=build['source'])
+rig = bpy.data.objects['Female_Armature']
+source = {name: geometry(bpy.data.objects[name]) for name in NAMES}
+original_images = skin_images()
+original_bones = skeleton(rig)
+original_actions = {a.name: action_hash(a) for a in bpy.data.actions}
+original_poses = sample_poses(rig)
+
+bpy.ops.wm.open_mainfile(filepath=str(OUT / 'Highhorn_Female_Commoner_TOON_TEST.blend'))
+rig = bpy.data.objects['Female_Armature']
+assert skeleton(rig) == original_bones
+assert len(rig.data.bones) == 24
+assert {a.name: action_hash(a) for a in bpy.data.actions} == original_actions
+assert skin_images() == original_images, 'The source face/skin images changed'
+mesh_changes = {}
+for name in NAMES:
+    styled = geometry(bpy.data.objects[name])
+    for key in ['uv', 'weights', 'topology', 'matrix', 'smooth_flags']:
+        if (key != 'smooth_flags' or name == 'Female_Body') and not(name=='Shoulders' and key=='weights'):
+            assert styled[key] == source[name][key], (name, key)
+    matrix = np.array(styled['matrix'])
+    delta = np.linalg.norm((styled['positions'] - source[name]['positions']) @ matrix[:3, :3].T, axis=1)
+    maximum = float(delta.max())
+    assert maximum <= (.000001 if name in ['Female_Body','Tunic'] else .15), (name, maximum)
+    if name=='Boots':
+        world=source[name]['positions']@matrix[:3,:3].T+matrix[:3,3]
+        assert float(delta[world[:,2]<.15].max())<1e-6, 'Shoe footprint changed'
+    mesh_changes[name] = {'vertices': len(delta), 'changed': int((delta > 1e-7).sum()), 'max_world_offset_m': maximum}
+    for mat in bpy.data.objects[name].data.materials:
+        shader = next(n for n in mat.node_tree.nodes if n.type == 'BSDF_PRINCIPLED')
+        assert shader.inputs['Metallic'].default_value == 0
+        assert shader.inputs['Roughness'].default_value >= .8
+        if name == 'Female_Body':
+            ramp=mat.node_tree.nodes['TOON_V5_LIGHT_BANDS']
+            assert ramp.color_ramp.interpolation=='EASE' and len(ramp.color_ramp.elements)==6
+        if name != 'Female_Body':
+            mesh=bpy.data.objects[name].data
+            assert mesh.has_custom_normals
+            for face in mesh.polygons:
+                normals=[Vector(mesh.corner_normals[i].vector) for i in face.loop_indices]
+                if face.use_smooth:
+                    assert all((n-normals[0]).length<.01 for n in normals), (name,'nonconstant face normal')
+                else:
+                    assert face.index in json.loads((OUT/'Normal_Report.json').read_text())[name]['geometric_normal_fallback_polygons']
+            ramp=next(n for n in mat.node_tree.nodes if n.type=='VALTORGB')
+            assert ramp.color_ramp.interpolation=='CONSTANT' and len(ramp.color_ramp.elements)==4
+            assert any(n.bl_idname=='ShaderNodeShaderToRGB' for n in mat.node_tree.nodes)
+            image = shader.inputs['Base Color'].links[0].from_node.image
+            assert tuple(image.size) == (1024, 1024) and image.packed_file
+
+styled_poses = sample_poses(rig)
+deformation = []
+for pose, original in original_poses.items():
+    maxima = {}
+    for name in NAMES:
+        maximum = float(np.linalg.norm(styled_poses[pose][name] - original[name], axis=1).max())
+        assert maximum <= (.000002 if name in ['Female_Body','Tunic'] else .16), (name, pose, maximum)
+        maxima[name] = maximum
+    deformation.append({'clip': pose[0], 'progress': pose[1], 'maximum_difference_m': maxima})
+
+def glb(path):
+    data = path.read_bytes()
+    assert struct.unpack_from('<III', data) == (0x46546c67, 2, len(data))
+    size = struct.unpack_from('<I', data, 12)[0]
+    doc = json.loads(data[20:20 + size])
+    binary = data[28 + size:]
+    def view(index):
+        v = doc['bufferViews'][index]
+        start = v.get('byteOffset', 0)
+        return binary[start:start + v['byteLength']]
+    def accessor(index):
+        a = doc['accessors'][index]
+        v = doc['bufferViews'][a['bufferView']]
+        code = {5121:'B', 5123:'H', 5125:'I', 5126:'f'}[a['componentType']]
+        width = {'SCALAR':1, 'VEC2':2, 'VEC3':3, 'VEC4':4, 'MAT4':16}[a['type']]
+        stride = v.get('byteStride', struct.calcsize(code) * width)
+        buf = view(a['bufferView'])
+        return [struct.unpack_from('<' + code * width, buf, a.get('byteOffset', 0) + j * stride) for j in range(a['count'])]
+    images = {im['name']: sha(view(im['bufferView'])) for im in doc['images']}
+    for im in doc['images']:
+        signature = b'\xff\xd8' if im['mimeType'] == 'image/jpeg' else b'\x89PNG'
+        assert view(im['bufferView']).startswith(signature)
+    triangles = 0
+    for mesh in doc['meshes']:
+        for primitive in mesh['primitives']:
+            attrs = primitive['attributes']
+            assert not any(k.startswith('COLOR_') for k in attrs)
+            assert all(math.isfinite(x) for row in accessor(attrs['POSITION']) for x in row)
+            assert all(abs(sum(row) - 1) < .002 for row in accessor(attrs['WEIGHTS_0']))
+            triangles += doc['accessors'][primitive['indices']]['count'] // 3
+    animations = {}
+    for animation in doc['animations']:
+        channels = {}
+        for channel in animation['channels']:
+            target = channel['target']
+            sampler = animation['samplers'][channel['sampler']]
+            values = [accessor(sampler[key]) for key in ['input', 'output']]
+            assert all(math.isfinite(x) for rows in values for row in rows for x in row)
+            channels[(doc['nodes'][target['node']]['name'], target['path'])] = sha(repr(values).encode())
+        animations[animation['name']] = channels
+    assert set(animations) == {'idle', 'walk', 'run'}
+    return doc, images, animations, triangles
+
+config = json.loads((OUT / 'study.json').read_text())
+source_doc, source_images, source_clips, source_tris = glb(ROOT / 'Exports/MedievalRoster/2026-11-01/CommonerBoots_v8/approved-female/preview.glb')
+style_doc, style_images, style_clips, style_tris = glb(OUT / 'female-commoner-toon.glb')
+for clip, channels in source_clips.items():
+    assert channels == {k:v for k,v in style_clips[clip].items() if k[1]!='weights'}, 'Bone animation channels changed'
+    assert sum(k[1]=='weights' for k in style_clips[clip])==2, 'Expected shoulders and pants morph tracks'
+assert source_tris == style_tris
+assert len(source_doc['meshes']) == len(style_doc['meshes']) == 5
+for name, digest in source_images.items():
+    if name in {'rig_basecolor', 'rig_normal'}:
+        assert style_images[name] == digest, name
+
+tunic=next(m for m in style_doc['materials'] if m['name']=='Highhorn v5 Tunic')
+assert np.allclose(tunic['pbrMetallicRoughness']['baseColorFactor'][:3], build['tunic_linear_factor'])
+assert all(0 < v < 1 for v in build['tunic_linear_factor'])
+production = json.loads((OUT / 'Production_Before.json').read_text())
+assert all(sha((ROOT / name).read_bytes()) == digest for name, digest in production.items())
+protected=json.loads((OUT/'Protected_Inputs.json').read_text())
+assert all(sha((ROOT/name).read_bytes())==digest for name,digest in protected.items())
+report = {
+    'passed': True, 'mesh_changes': mesh_changes, 'poses': deformation,
+    'bones': 24, 'triangles': style_tris, 'runtime_bone_channels_identical': True, 'additional_cloth_morph_tracks': 2,
+    'skin_image_pixels_and_runtime_color_normal_payloads_identical': True,
+    'uv_topology_and_object_transforms_identical':True,'weights_preserved_except_refitted_shoulders':True,
+    'production_files_unchanged': len(production),'original_female_and_male_v5_files_unchanged':len(protected),
+    'scope': 'Reopened Blender data/material/image checks; fifteen finite animated poses and bounded garment fitting changes, identical skin/tunic base geometry and hard/soft Eevee nodes; GLB data, normalized weights and exact bone animation channels plus cloth morph tracks; 288 contact samples and production hash guard. No continuous collision certification or interactive Blender GUI inspection.'
+}
+from Highhorn_Fit_Toon_v5 import checks
+report['dense_contact_samples']=checks(rig,96)
+report['sampled_contact_maxima']={key:max(row[key] for row in report['dense_contact_samples']) for key in ['Tunic-Shoulders','Pants-Boots']}
+assert all(v==0 for v in report['sampled_contact_maxima'].values()), report['sampled_contact_maxima']
+report['shape_keys']={name:[k.name for k in bpy.data.objects[name].data.shape_keys.key_blocks] for name in ['Shoulders','Pants']}
+report['fit_checks']=json.loads((OUT/'Fit_Report.json').read_text())
+(OUT / 'Validation.json').write_text(json.dumps(report, indent=2))
+print('STYLE VALIDATION PASSED', json.dumps(mesh_changes), flush=True)

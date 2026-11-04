@@ -1,4 +1,4 @@
-/* Highhorn 0.25 styles */
+/* Highhorn 0.27.0 styles */
 :root{
   --ui:1;
   --bg:#dccfba; --panel:rgba(250,244,233,.94); --ink:#2b211b; --muted:#6b5a4a;
@@ -949,3 +949,5 @@ select option:disabled{color:GrayText}
 .commoner-outfit-note{margin:8px 0 18px;font-size:.9rem}
 #cmodel{width:100%;margin-bottom:6px}
 @media(max-width:760px){.creator--commoner{grid-template-columns:1fr}.creator--commoner .cprev{position:static}.commoner-viewport{height:400px}.commoner-preview{max-width:430px;margin:auto}}
+/* The v0.26 sidebar leaves less space for the creator on smaller desktops. */
+@media(max-width:1150px){.creator--commoner{grid-template-columns:1fr}.creator--commoner .cprev{position:static}.creator--commoner .commoner-preview{max-width:430px;margin:auto}.creator--commoner .commoner-viewport{height:400px}}

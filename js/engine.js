@@ -1,5 +1,5 @@
-/* Highhorn 0.25: rules engine, game data and map generation. Pure: no graphics, no page.
-   Files load in this order: engine.js, bots.js, sound.js, game.js. */
+/* Highhorn 0.27.0: rules engine, game data and map generation. Pure: no graphics, no page.
+   Page load order: engine.js, bots.js, sound.js, hero-toon.js, hero-commoner.js, game.js. */
 'use strict';
 const $ = s => document.querySelector(s);
 const SQ3 = Math.sqrt(3);
@@ -86,28 +86,28 @@ const HERO_MOVES = 2;
 // offers (offers per turn), counter (chance to counter instead of declining), leaderHate (how much they target the leader),
 // plan (how far ahead they plan roads), roadBias, cityBias, devBias, fishBias.
 const AI_DEFS = {
-  aracanus:{name:'Aracanus',title:'the Ageless Blade',diff:'Hard',ability:'warlord',
-    look:{skin:'#d9ae86',hair:'#d9d4cc',hairStyle:'long',headwear:'circlet',cape:true,outfit:'#26262b',sigil:'flame'},
+  aracanus:{name:'Aracanus',gender:'male',title:'the Ageless Blade',diff:'Hard',ability:'warlord',
+    look:{model:'male-commoner',gender:'male',skin:'#d9ae86',hair:'#d9d4cc',hairStyle:'long',headwear:'circlet',cape:true,outfit:'#26262b',sigil:'flame'},
     bio:'A crossover from Perisno. He claims to come from a time when only the gods walked the earth, and carries Flamebringer, the blade his ancestor forged. A patient tactician: he raises armies early, besieges the leader and rarely trades.',
     p:{aggr:1.2,armies:1,tradeT:0.2,offers:1,counter:0.3,leaderHate:1.5,plan:5,cityBias:1,fishBias:0.5,hard:1}},
-  corra:{name:'Corra',title:'of the Golden Fields',diff:'Hard',ability:'farmer',
-    look:{skin:'#f1d1b5',hair:'#c8a25a',hairStyle:'long',headwear:'none',cape:false,outfit:'#c9a227',sigil:'sun'},
+  corra:{name:'Corra',gender:'female',title:'of the Golden Fields',diff:'Hard',ability:'farmer',
+    look:{model:'female-commoner',gender:'female',skin:'#f1d1b5',hair:'#c8a25a',hairStyle:'long',headwear:'none',cape:false,outfit:'#c9a227',sigil:'sun'},
     bio:'Runs the richest farmsteads in Highhorn and wants a city on every hill. Plays efficiently, trades shrewdly and buys development cards.',
     p:{aggr:0.4,armies:0,tradeT:0.1,offers:1,counter:0.6,leaderHate:1.3,plan:5,cityBias:1,devBias:0.2,fishBias:0.5,hard:1}},
-  brannoc:{name:'Brannoc',title:'the Bridgewright',diff:'Normal',ability:'engineer',
-    look:{skin:'#b07d56',hair:'#6b4423',hairStyle:'short',headwear:'hat',cape:false,outfit:'#8a5a2b',sigil:'anchor'},
+  brannoc:{name:'Brannoc',gender:'male',title:'the Bridgewright',diff:'Normal',ability:'engineer',
+    look:{model:'male-commoner',gender:'male',skin:'#b07d56',hair:'#6b4423',hairStyle:'short',headwear:'hat',cape:false,outfit:'#8a5a2b',sigil:'anchor'},
     bio:'Has built a bridge over every river in Highhorn and means to build the rest. Races for Longest Road and the best corners.',
     p:{aggr:0.5,armies:0,tradeT:0.1,offers:1,counter:0.5,leaderHate:1,plan:6,roadBias:1}},
-  sella:{name:'Sella',title:'Silvertongue',diff:'Normal',ability:'merchant',
-    look:{skin:'#d9ae86',hair:'#a8442a',hairStyle:'braids',headwear:'none',cape:true,outfit:'#40576e',sigil:'crown'},
+  sella:{name:'Sella',gender:'female',title:'Silvertongue',diff:'Normal',ability:'merchant',
+    look:{model:'female-commoner',gender:'female',skin:'#d9ae86',hair:'#a8442a',hairStyle:'braids',headwear:'none',cape:true,outfit:'#40576e',sigil:'crown'},
     bio:'Travels the mountain passes with a cart of everything. Trades constantly, but always asks a little more than it is worth.',
     p:{aggr:0.3,armies:0,tradeT:0.35,offers:2,counter:0.95,leaderHate:1,plan:4,devBias:0.3}},
-  fen:{name:'Fen',title:'of the Still Lakes',diff:'Normal',ability:'angler',
-    look:{skin:'#7a4f33',hair:'#2b211b',hairStyle:'bald',headwear:'hat',cape:false,outfit:'#3d6b4a',sigil:'wave'},
+  fen:{name:'Fen',gender:'male',title:'of the Still Lakes',diff:'Normal',ability:'angler',
+    look:{model:'male-commoner',gender:'male',skin:'#7a4f33',hair:'#2b211b',hairStyle:'bald',headwear:'hat',cape:false,outfit:'#3d6b4a',sigil:'wave'},
     bio:'Would rather fish than fight. Settles by the lakes, hires fishermen early and trades fish for almost anything.',
     p:{aggr:0.2,armies:-1,tradeT:0,offers:1,counter:0.4,leaderHate:0.8,plan:4,fishBias:1,devBias:0.2}},
-  moira:{name:'Old Moira',title:'the Yak-wife',diff:'Easy',ability:'herder',
-    look:{skin:'#f1d1b5',hair:'#d9d4cc',hairStyle:'bun',headwear:'hood',cape:false,outfit:'#6b4a8a',sigil:'moon'},
+  moira:{name:'Old Moira',gender:'female',title:'the Yak-wife',diff:'Easy',ability:'herder',
+    look:{model:'female-commoner',gender:'female',skin:'#f1d1b5',hair:'#d9d4cc',hairStyle:'bun',headwear:'hood',cape:false,outfit:'#6b4a8a',sigil:'moon'},
     bio:'Has herded yaks on the high pastures longer than anyone remembers. Generous with trades, slow to anger, and never raises a sword.',
     p:{aggr:0,armies:-3,tradeT:-0.3,offers:2,counter:0.3,leaderHate:0.6,plan:3,devBias:0.2}},
 };

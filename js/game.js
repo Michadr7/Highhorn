@@ -1,4 +1,4 @@
-/* Highhorn 0.25: 3D board, interface, lobby and saving.
+/* Highhorn 0.27.0: 3D board, interface, lobby and saving.
    Files load in this order: engine.js, bots.js, sound.js, game.js. */
 'use strict';
 /* =====================================================================
@@ -659,15 +659,8 @@ function portraitRig(){
   return PR;
 }
 function heroPortrait(L,css,ability,expr){
-  if(L&&L.model==='male-commoner') return 'Models/Heroes/MaleCommoner/portrait.png';
-  const P=portraitRig(); if(!P) return null;
-  const key=JSON.stringify([L||{},css,ability||'',expr]); if(prCache[key]) return prCache[key];
-  if(P.size!==192){P.r.setSize(192,192,false);P.size=192;}
-  const h=buildHero(L,css,ability,expr); h.rotation.y=-0.35; P.sc.add(h);
-  P.cam.fov=26; P.cam.updateProjectionMatrix(); P.cam.position.set(0.36,0.29,0.06); P.cam.lookAt(0,0.262,0);
-  P.r.setClearColor(0x000000,0); P.r.render(P.sc,P.cam);
-  const url=P.r.domElement.toDataURL('image/png'); P.sc.remove(h);
-  return prCache[key]=url;
+  // Legacy saves keep all their data; their presentation now uses the whole Commoner.
+  return HighhornCommoner.portrait(L);
 }
 // Rotating full-body preview in the hero creator
 let previewHero=null, previewKey='';
@@ -685,6 +678,7 @@ function drawPreview(now){
 // Idle, walking and celebrating, shared by the board and the creator preview
 const heroFx={};
 function animateHeroParts(h,now,ph,walking,p){
+  if(h.userData.commoner){HighhornCommoner.animateBoard(h,now,walking,reduceMotion());return;}
   const u=h.userData.parts; if(!u) return;
   const t=now/1000, rm=reduceMotion();
   if(rm){u.head.rotation.y=0;return;}
@@ -808,7 +802,7 @@ function renderPieces(G){
     if(!h.edge) return;
     const e=B.edges.get(h.edge), a=B.corners.get(e.a), b=B.corners.get(e.b), dx=b.x-a.x, dz=b.z-a.z, len=Math.hypot(dx,dz), px=-dz/len, pz=dx/len;
     const others=G.heroes.filter((x,q)=>q<p&&x.edge===h.edge).length, tt=0.22+others*0.14, side=e.army?0.09:0;
-    const g=buildHero(L,PLAYERS[p].css,h.ability); g.scale.setScalar(HERO_S); heroMeshes[p]=g;
+    const g=HighhornCommoner.boardHero(p,PLAYERS[p].css,HighhornCommoner.modelFor(L,{key:h.name})); g.scale.setScalar(HERO_S); heroMeshes[p]=g;
     g.position.set(a.x+dx*tt+px*side,TOP+(e.river?0.09:0.012),a.z+dz*tt+pz*side); g.rotation.y=Math.atan2(px,pz)+Math.PI/2;
     if(h.wounded!==false){g.rotation.z=0.5; g.position.y-=0.03;}
     {const prev=heroPrev[p], to=g.position.clone();
@@ -1019,7 +1013,7 @@ function animate(){
     smokeIM.count=i; smokeIM.instanceMatrix.needsUpdate=true;
   }
   for(let i=anims.length-1;i>=0;i--){const a=anims[i];if(now<a.t0) continue;const k=Math.min(1,(now-a.t0)/a.dur);a.fn(k);if(k>=1){anims.splice(i,1);a.done&&a.done();}}
-  if($('#lobbyScr').hidden||lbSec!=='hero'||!draft||draft.look.model!=='male-commoner') renderer.render(scene,camera);
+  if($('#lobbyScr').hidden||lbSec!=='hero'||!draft) renderer.render(scene,camera);
 }
 
 /* =====================================================================
@@ -1199,18 +1193,33 @@ function drawDie(el,n,spin){
   const [rx,ry]=DIE_ROT[n||1]; el.querySelector('.cube').style.transform=`rotateX(${rx+el.spinX}deg) rotateY(${ry+el.spinY}deg)`;
 }
 
-const HERO_NAMES=['Aldric','Brenna','Corwin','Dagny','Edric','Fenna','Gareth','Hilde','Ivo','Jora','Kestrel','Lio','Maren','Nils','Orla','Pell','Runa','Soren','Tamsin','Ulf','Vera','Wren'];
+const HERO_IDENTITIES=[['Aldric','male'],['Brenna','female'],['Corwin','male'],['Dagny','female'],['Edric','male'],['Fenna','female'],['Gareth','male'],['Hilde','female'],['Ivo','male'],['Jora','female'],['Kestrel',null],['Lio','male'],['Maren','female'],['Nils','male'],['Orla','female'],['Pell','male'],['Runa','female'],['Soren','male'],['Tamsin','female'],['Ulf','male'],['Vera','female'],['Wren',null]];
+const HERO_NAMES=HERO_IDENTITIES.map(h=>h[0]);
+function heroAppearance(hero,ai){
+  const result=Object.assign({},hero,{look:Object.assign({},hero?.look||{})});
+  const named=AI_DEFS[ai],known=HERO_IDENTITIES.find(h=>h[0]===result.name);
+  const model=HighhornCommoner.modelFor(result.look,{gender:named?.gender||known?.[1],model:named?.look.model,key:result.name||'Hero'});
+  // Fill missing presentation fields in memory; keep explicit and future model IDs.
+  if(!result.look.model)result.look.model=model;
+  if(!result.look.gender)result.look.gender=HighhornCommoner.models().find(m=>m.id===model).gender;
+  return result;
+}
 const SKINS=['#f1d1b5','#d9ae86','#b07d56','#7a4f33'], HAIRS=['#2b211b','#6b4423','#c8a25a','#a8442a','#d9d4cc'], SIGILS=['shield','star','tree','crown','wave','sun'];
 const pickR=a=>a[Math.floor(Math.random()*a.length)];
 function loadSeats(){try{const s=JSON.parse(localStorage.getItem('hexworld.seats')||'null');if(Array.isArray(s)) return s.map(x=>x&&PALETTE.some(c=>c.name===x.color)?x:Object.assign({},x,{color:undefined}));}catch(e){}return [];}
 function saveSeats(seats){try{localStorage.setItem('hexworld.seats',JSON.stringify(seats));}catch(e){}}
-function randomHero(){return {name:pickR(HERO_NAMES),ability:pickR(Object.keys(ABILITIES)),look:{skin:pickR(SKINS),hair:pickR(HAIRS),sigil:pickR(SIGILS),hairStyle:pickR(['short','short','long','bun','braids','bald']),headwear:pickR(['none','none','hood','hat']),cape:Math.random()<0.4}};}
+function randomHero(model){
+  const preferred=HighhornCommoner.models().find(m=>m.id===model);
+  const identity=pickR(preferred?HERO_IDENTITIES.filter(h=>!h[1]||h[1]===preferred.gender):HERO_IDENTITIES);
+  const gender=preferred?.gender||identity[1]||pickR(['male','female']);
+  return {name:identity[0],ability:pickR(Object.keys(ABILITIES)),look:{model:gender+'-commoner',gender,skin:pickR(SKINS),hair:pickR(HAIRS),sigil:pickR(SIGILS),hairStyle:pickR(['short','short','long','bun','braids','bald']),headwear:pickR(['none','none','hood','hat']),cape:Math.random()<0.4}};
+}
 let lobby=null;
 function startGame(){showLobby('play');}
 function startGameOld(){
   const np=+$('#np').value, saved=loadSeats();
   const def=['Red','Blue','White','Orange'];
-  lobby=Array.from({length:np},(_,i)=>{const sv=saved[i]||{};const h=sv.hero||randomHero();return {bot:sv.bot!==undefined?!!sv.bot:i>0,color:sv.color||def[i],hero:{name:h.name||pickR(HERO_NAMES),ability:ABILITIES[h.ability]?h.ability:'farmer',look:Object.assign({skin:SKINS[1],hair:HAIRS[0],sigil:'shield'},h.look||{})}};});
+  lobby=Array.from({length:np},(_,i)=>{const sv=saved[i]||{};const h=heroAppearance(sv.hero||randomHero());return {bot:sv.bot!==undefined?!!sv.bot:i>0,color:sv.color||def[i],hero:{name:h.name||pickR(HERO_NAMES),ability:ABILITIES[h.ability]?h.ability:'farmer',look:Object.assign({skin:SKINS[1],hair:HAIRS[0],sigil:'shield'},h.look||{})}};});
   // a favorite color that clashes goes to the earlier seat; the later seat gets a random free color
   lobby.forEach((s,i)=>{if(lobby.slice(0,i).some(o=>o.color===s.color)){const free=PALETTE.map(c=>c.name).filter(n=>!lobby.some(o=>o.color===n));s.color=pickR(free);s.bumped=true;}});
   openLobby();
@@ -1247,6 +1256,7 @@ function openLobby(){
 function beginGame(){
   const seed=$('#seed').value.trim()||randomSeed(); $('#seed').value=seed;
   if(lobby&&lobby[0]&&lobby[0].type){
+    lobby.forEach(s=>{if(s.type!=='you')s.hero=heroAppearance(s.hero,s.ai);});
     try{localStorage.setItem('hexworld.seats2',JSON.stringify(lobby.map(s=>({type:s.type,color:s.color,hero:s.hero,ai:s.ai}))));}catch(e){}
     // empty online seats become bots
     lobby.forEach((s,i)=>{if(s.type==='online'&&!(NET.mode==='host'&&NET.conns.some(g=>g.seat===i))){s.type='bot';s.ai='';}});
@@ -2155,6 +2165,7 @@ function startRecording(meta){saveMeta=meta;G.actions=[];writeSave();}
 function loadSaved(){
   const sv=readSave(); if(!sv){toast('That saved game can no longer be loaded.','err');return false;}
   sv.colors.forEach((c,i)=>{PLAYERS[i]=Object.assign({},PALETTE.find(x=>x.name===c));});
+  sv.heroes=sv.heroes.map((hero,i)=>heroAppearance(hero,sv.opts?.ai?.[i]));
   setLabels(sv.heroes);
   const B=Board.generate(sv.seed,sv.R,sv.balanced,sv.style||'classic');
   replaying=true;
@@ -2476,8 +2487,9 @@ function avatarFrom(L,css,mouth='neutral',ability){
   return `<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="20" fill="${css}" opacity=".28"/><path d="M5 40 Q7 28.5 20 28.5 Q33 28.5 35 40 Z" fill="${out}"/><circle cx="20" cy="19" r="9.5" fill="${skin}"/><path d="M10.4 18 Q11 8.4 20 8.4 Q29 8.4 29.6 18 Q26 13 20 13 Q14 13 10.4 18 Z" fill="${hair}"/><circle cx="16.5" cy="20" r="1.25" fill="#2a2420"/><circle cx="23.5" cy="20" r="1.25" fill="#2a2420"/>${brows}<path d="${MOUTH[mouth]||MOUTH.neutral}" stroke="#2a2420" stroke-width="1.4" fill="${mouth==='open'?'#7a2a20':'none'}" stroke-linecap="round"/></svg>`;
 }
 const BASE_OUTFITS=[null,'#3d6b4a','#6b4a8a','#8a5a2b','#40576e'];
-const UNLOCKS=[{lvl:2,kind:'sigil',id:'moon',name:'Moon banner'},{lvl:4,kind:'head',id:'circlet',name:'Gold circlet'},{lvl:3,kind:'outfit',id:'#c9a227',name:'Gold outfit'},{lvl:3,kind:'sigil',id:'anchor',name:'Anchor banner'},
-  {lvl:4,kind:'sigil',id:'flame',name:'Flame banner'},{lvl:5,kind:'outfit',id:'#26262b',name:'Midnight outfit'},{lvl:6,kind:'outfit',id:'#ece6d8',name:'Ivory outfit'}];
+const UNLOCKS=[{lvl:2,kind:'sigil',id:'moon',name:'Moon banner'},
+  {lvl:3,kind:'sigil',id:'anchor',name:'Anchor banner'},
+  {lvl:4,kind:'sigil',id:'flame',name:'Flame banner'}];
 const ACH=[
   {id:'first_win',name:'First victory',desc:'Win a game.',test:(G,p)=>G.winner===p},
   {id:'quick',name:'Swift rise',desc:'Win within 15 rounds.',test:(G,p)=>G.winner===p&&Math.ceil(G.turnNo/G.np)<=15},
@@ -2491,8 +2503,8 @@ const ACH=[
   {id:'versatile',name:'Jack of all trades',desc:'Win with 3 different hero abilities.',test:(G,p,pr)=>Object.values(pr.byAbility).filter(x=>x.wins>0).length>=3},
 ];
 const PROF_KEY='hexworld.profile';
-function defaultProfile(){const h=randomHero();return {name:'Player',color:'Red',hero:{name:h.name,ability:h.ability,look:{skin:h.look.skin,hair:h.look.hair,sigil:h.look.sigil,outfit:null}},xp:0,games:0,wins:0,best:0,byAbility:{},achievements:{},history:[]};}
-function loadProfile(){try{const p=JSON.parse(localStorage.getItem(PROF_KEY)||'null');if(p&&p.hero) return Object.assign(defaultProfile(),p);}catch(e){}return defaultProfile();}
+function defaultProfile(){const h=randomHero();return {name:'Player',color:'Red',hero:{name:h.name,ability:h.ability,look:{model:h.look.model,gender:h.look.gender,skin:h.look.skin,hair:h.look.hair,sigil:h.look.sigil,outfit:null}},xp:0,games:0,wins:0,best:0,byAbility:{},achievements:{},history:[]};}
+function loadProfile(){try{const p=JSON.parse(localStorage.getItem(PROF_KEY)||'null');if(p&&p.hero) return Object.assign(defaultProfile(),p,{hero:heroAppearance(p.hero)});}catch(e){}return defaultProfile();}
 let profile=loadProfile();
 const saveProfile=()=>{try{localStorage.setItem(PROF_KEY,JSON.stringify(profile));}catch(e){}};
 function levelInfo(xp){let lvl=1,need=250,acc=0;while(xp>=acc+need){acc+=need;lvl++;need=250+100*(lvl-1);}return {lvl,into:xp-acc,need};}
@@ -2529,6 +2541,7 @@ $('#lbProf').addEventListener('click',()=>renderLobby('profile'));
 
 /* ---- home ---- */
 const UPDATE_NOTES=[
+  {v:'0.27.0',items:['Male and Female Commoners now wear medieval outfits with a painted toon style','Animated Commoners appear in the Hero Creator, portraits and on the board','Named opponents use consistent male or female characters, while your saved hero choices are kept']},
   {v:'0.25',items:['Online games now run through rooms on the Highhorn server, so they work on any network: home Wi-Fi, office, school, VPN or mobile data','Clearer messages when a room code is wrong or the host leaves']},
   {v:'0.24.1',items:['Hover over any village or city to see who owns it, what it produces, and whether it is besieged or under threat','Motion setting in the Menu: follow your device, or choose full or reduced motion','A note when your device has asked for less motion, so a still board isn’t a mystery']},
   {v:'0.24',items:['Trading between online players: offers, answers and counter-offers travel between devices','Menus in yak chestnut and horn ochre instead of teal']},
@@ -2574,7 +2587,7 @@ function renderHome(){
 function seatsDefault(np){
   let saved=[];try{saved=JSON.parse(localStorage.getItem('hexworld.seats2')||'[]');}catch(e){}
   const def=['Red','Blue','White','Orange'];
-  const out=Array.from({length:np},(_,i)=>{const sv=saved[i]||{};return {ai:sv.ai&&AI_DEFS[sv.ai]?sv.ai:'',type:sv.type||(i===0?'you':'bot'),color:sv.color&&PALETTE.some(c=>c.name===sv.color)?sv.color:def[i],hero:sv.hero&&ABILITIES[sv.hero.ability]?sv.hero:randomHero()};});
+  const out=Array.from({length:np},(_,i)=>{const sv=saved[i]||{};return {ai:sv.ai&&AI_DEFS[sv.ai]?sv.ai:'',type:sv.type||(i===0?'you':'bot'),color:sv.color&&PALETTE.some(c=>c.name===sv.color)?sv.color:def[i],hero:heroAppearance(sv.hero&&ABILITIES[sv.hero.ability]?sv.hero:(AI_DEFS[sv.ai]?{name:AI_DEFS[sv.ai].name,ability:AI_DEFS[sv.ai].ability,look:AI_DEFS[sv.ai].look}:randomHero()),sv.ai)};});
   if(!out.some(s=>s.type==='you')) out[0].type='you';
   out.forEach((s,i)=>{if(s.type==='you') s.color=profile.color;});
   fixColors(out); return out;
@@ -2621,8 +2634,8 @@ let draft=null;
 function renderCreator(){
   if(!draft) draft=JSON.parse(JSON.stringify(profile.hero));
   const L=draft.look, css=colorCss(profile.color), lvl=levelInfo(profile.xp).lvl;
-  if(!L.model) L.model='male-commoner';
-  const commoner=L.model==='male-commoner';
+  const displayModel=HighhornCommoner.modelFor(L,{key:draft.name});
+  const commoner=true;
   if(!commoner) HighhornCommoner.suspend();
   const lockOf=(kind,id)=>UNLOCKS.find(u=>u.kind===kind&&u.id===id);
   const outfits=[...BASE_OUTFITS,...UNLOCKS.filter(u=>u.kind==='outfit').map(u=>u.id)];
@@ -2631,16 +2644,11 @@ function renderCreator(){
     <div class="cprev">${commoner?'<div id="commonerMount"></div>':`<div class="bigav">${portraitRig()?'<canvas id="hero3d" width="360" height="360" aria-label="Your hero, turning slowly"></canvas>':avatarFrom(L,css,'smile',draft.ability)}</div>`}<canvas id="cflag" width="120" height="84"></canvas>
       <p class="m">${draft.name} the ${ABILITIES[draft.ability].name}</p><button class="btn" id="crand">Randomize</button></div>
     <div class="cform">
-      <label class="lbl" for="cmodel">Character</label><select id="cmodel"><option value="male-commoner" ${commoner?'selected':''}>Male Commoner · Level 1</option><option value="prototype" ${!commoner?'selected':''}>Original prototype</option></select>
+      <label class="lbl" for="cmodel">Character</label><select id="cmodel">${HighhornCommoner.models().map(m=>`<option value="${m.id}" ${m.id===displayModel?'selected':''}>${m.label} · Level 1</option>`).join('')}</select>
       ${commoner?'<p class="m commoner-outfit-note">A medieval tunic, trousers, boots and shoulder garment. Customize your name, banner and ability below.</p>':''}
       <label class="lbl" for="cname">Hero name</label><input id="cname" type="text" maxlength="16" value="${draft.name.replace(/"/g,'')}">
       <p class="lbl">Favorite color (used when it's free)</p><div class="swrow">${PALETTE.map(c=>`<button class="swb" data-fc="${c.name}" aria-pressed="${c.name===profile.color}" title="${c.name}" style="background:${c.css}"></button>`).join('')}</div>
-      <div class="legacy-appearance" ${commoner?'hidden':''}><p class="lbl">Outfit</p><div class="swrow">${outfits.map(o=>{const u=o&&lockOf('outfit',o),lk=u&&lvl<u.lvl;return `<button class="swb${lk?' locked':''}" data-of="${o||''}" aria-pressed="${(L.outfit||null)===o}" ${lk?`disabled title="${u.name}: unlocks at level ${u.lvl}"`:`title="${o?'Outfit':'Team color'}"`} style="background:${o||css}">${o?'':'<small>team</small>'}</button>`;}).join('')}</div>
-      <p class="lbl">Skin</p><div class="swrow">${SKINS.map(c=>`<button class="swb round" data-sk="${c}" aria-pressed="${c===L.skin}" style="background:${c}" title="Skin tone"></button>`).join('')}</div>
-      <p class="lbl">Hairstyle</p><div class="swrow">${HAIRSTYLES.map(([k,n])=>`<button class="btn sm" data-hs="${k}" aria-pressed="${(L.hairStyle||'short')===k}">${n}</button>`).join('')}</div>
-      <p class="lbl">Headwear and cape</p><div class="swrow">${HEADWEAR.map(([k,n])=>{const u=lockOf('head',k),lk=u&&lvl<u.lvl;return `<button class="btn sm${lk?' locked':''}" data-hw="${k}" aria-pressed="${(L.headwear||'none')===k}" ${lk?`disabled title="${u.name}: unlocks at level ${u.lvl}"`:''}>${n}${lk?' (level '+u.lvl+')':''}</button>`;}).join('')}<button class="btn sm" data-cape="1" aria-pressed="${!!L.cape}">${L.cape?'Cape: on':'Cape: off'}</button></div>
-      <p class="lbl">Hair color</p><div class="swrow">${HAIRS.map(c=>`<button class="swb round" data-hr="${c}" aria-pressed="${c===L.hair}" style="background:${c}" title="Hair color"></button>`).join('')}</div>
-      </div><p class="lbl">Banner</p><div class="swrow">${sigils.map(g=>{const u=lockOf('sigil',g),lk=u&&lvl<u.lvl;return `<button class="swb sigb${lk?' locked':''}" data-sg="${g}" aria-pressed="${g===L.sigil}" ${lk?`disabled title="${u.name}: unlocks at level ${u.lvl}"`:`title="${g}"`}><canvas width="52" height="52" data-sigc="${g}"></canvas></button>`;}).join('')}</div>
+      <p class="lbl">Banner</p><div class="swrow">${sigils.map(g=>{const u=lockOf('sigil',g),lk=u&&lvl<u.lvl;return `<button class="swb sigb${lk?' locked':''}" data-sg="${g}" aria-pressed="${g===L.sigil}" ${lk?`disabled title="${u.name}: unlocks at level ${u.lvl}"`:`title="${g}"`}><canvas width="52" height="52" data-sigc="${g}"></canvas></button>`;}).join('')}</div>
       <p class="lbl">Ability</p><div class="abil2">${Object.entries(ABILITIES).map(([k,x])=>`<button data-ab2="${k}" aria-pressed="${k===draft.ability}"><span class="lt" style="background:${x.color}">${x.letter}</span><strong>${x.name}</strong><small>${x.desc}</small></button>`).join('')}</div>
       <div class="mact"><button class="btn" id="cundo">Discard changes</button><button class="primary" id="csave">Save hero</button></div>
     </div></div>`;
@@ -2650,12 +2658,12 @@ function renderCreator(){
   Q('[data-fc]',b=>{profile.color=b.dataset.fc;saveProfile();});
   Q('[data-of]',b=>{L.outfit=b.dataset.of||null;});
   Q('[data-hs]',b=>{L.hairStyle=b.dataset.hs;}); Q('[data-hw]',b=>{L.headwear=b.dataset.hw;}); Q('[data-cape]',()=>{L.cape=!L.cape;});
-  if(commoner){previewHero=null;HighhornCommoner.mount($('#commonerMount'),{reducedMotion:reduceMotion(),quality:uiPrefs.quality});}
+  if(commoner){previewHero=null;HighhornCommoner.mount($('#commonerMount'),{model:displayModel,reducedMotion:reduceMotion(),quality:uiPrefs.quality});}
   else previewHero=buildHero(L,css,draft.ability,'smile');
-  $('#cmodel').addEventListener('change',e=>{L.model=e.target.value;renderCreator();});
+  $('#cmodel').addEventListener('change',e=>{L.model=e.target.value;L.gender=HighhornCommoner.models().find(m=>m.id===L.model).gender;renderCreator();});
   Q('[data-sk]',b=>{L.skin=b.dataset.sk;}); Q('[data-hr]',b=>{L.hair=b.dataset.hr;}); Q('[data-sg]',b=>{L.sigil=b.dataset.sg;});
   Q('[data-ab2]',b=>{draft.ability=b.dataset.ab2;});
-  $('#crand').addEventListener('click',()=>{const r=randomHero();draft={name:r.name,ability:r.ability,look:{skin:r.look.skin,hair:r.look.hair,sigil:r.look.sigil,hairStyle:r.look.hairStyle,headwear:r.look.headwear,cape:r.look.cape,outfit:L.outfit,model:L.model}};renderCreator();});
+  $('#crand').addEventListener('click',()=>{const r=randomHero(displayModel);draft={name:r.name,ability:r.ability,look:{skin:r.look.skin,hair:r.look.hair,sigil:r.look.sigil,hairStyle:r.look.hairStyle,headwear:r.look.headwear,cape:r.look.cape,outfit:L.outfit,model:L.model,gender:L.gender}};renderCreator();});
   $('#cname').addEventListener('input',e=>{draft.name=e.target.value.trim()||'Hero';});
   $('#cundo').addEventListener('click',()=>{draft=null;renderCreator();});
   $('#csave').addEventListener('click',()=>{profile.hero=JSON.parse(JSON.stringify(draft));saveProfile();draft=null;Snd.play('fanfare');toast(`${profile.hero.name} is saved.`);renderLobby('home');});

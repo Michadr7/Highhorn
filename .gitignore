@@ -1,0 +1,22 @@
+# Local art sources, reviews, recovery archives and generated tests.
+/Exports/
+/Cloting/
+/Models/*
+!/Models/Heroes/
+
+# Keep development scripts and runtime Heroes versionable.
+**/__pycache__/
+*.py[cod]
+*.blend
+*.blend[0-9]*
+**/ChromeProfile/
+**/.browser*/
+*.log
+*.tmp
+node_modules/
+.wrangler/
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*

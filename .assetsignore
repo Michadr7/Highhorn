@@ -1,0 +1,35 @@
+# Public game assets only. Worker code is bundled separately by Wrangler.
+# https://developers.cloudflare.com/workers/static-assets/binding/#ignoring-assets
+/*
+!/index.html
+!/favicon.svg
+!/_headers
+!/css/
+!/js/
+!/assets/
+!/Models/
+
+# Publish only the two currently integrated character packages.
+/Models/*
+!/Models/Heroes/
+/Models/Heroes/*
+!/Models/Heroes/MaleCommoner/
+!/Models/Heroes/FemaleCommoner/
+/Models/Heroes/MaleCommoner/*
+!/Models/Heroes/MaleCommoner/Toon_v1/
+/Models/Heroes/FemaleCommoner/*
+!/Models/Heroes/FemaleCommoner/Toon_v1/
+
+# Do not expose development artifacts placed inside an allowed folder.
+**/__pycache__/
+**/ChromeProfile/
+**/.browser*/
+*.blend
+*.blend[0-9]*
+*.fbx
+*.zip
+*.log
+*.tmp
+*.map
+*.py
+*.cjs
